@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=35.200.245.171
+      - DB_PORT=5432
+      - DB_NAME=dataanalytics
+      - DB_USER=analyticsUser
+      - DB_PASSWORD=AnalyticsUsr@2025
+      - NEXT_TELEMETRY_DISABLED=1
+    # Or use env_file instead:
+    # env_file:
+    #   - .env.qa
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+  # Uncomment if you need a PostgreSQL database
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_DB: your_db_name
+  #     POSTGRES_USER: your_username
+  #     POSTGRES_PASSWORD: your_password
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./lib/db-init.sql:/docker-entrypoint-initdb.d/init.sql
+  #   restart: unless-stopped
+
+# volumes:
+#   postgres_data:

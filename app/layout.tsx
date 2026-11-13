@@ -27,7 +27,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${poppins.variable} font-sans antialiased`}
+        className={`${inter.variable} ${poppins.variable} font-sans antialiased text-[13px]`}
+        style={{ fontSize: "13px" }}
       >
         <ThemeProvider
           attribute="class"

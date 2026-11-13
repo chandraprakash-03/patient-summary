@@ -2,7 +2,10 @@ import {
 	PatientData,
 	PatientSummary,
 	PatientWithClinicalSummary,
+	PatientListItem,
 } from "@/types/patient";
+
+export type { PatientListItem };
 
 // Cache for loaded patient data
 const patientCache = new Map<string, PatientData>();
@@ -175,6 +178,14 @@ async function loadPatientList(): Promise<void> {
 export async function getAllPatientUIDs(): Promise<string[]> {
 	await loadPatientList();
 	return Array.from(patientListCache.keys());
+}
+
+/**
+ * Get all patient records with summary details for the dashboard table
+ */
+export async function getPatientListDetails(): Promise<PatientListItem[]> {
+	await loadPatientList();
+	return Array.from(patientListCache.values()) as unknown as PatientListItem[];
 }
 
 /**

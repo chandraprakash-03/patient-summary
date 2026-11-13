@@ -167,9 +167,9 @@ export function VisitSummary({ patientData }: VisitSummaryProps) {
 
               {/* Procedures */}
               {procsAtDate.length > 0 && (
-                <div className="bg-blue-500/5 p-3 rounded-lg border border-blue-500/20">
-                  <div className="font-bold text-xs text-blue-600 uppercase mb-2 flex items-center gap-1.5 tracking-wider">
-                    <Droplets className="w-3.5 h-3.5" /> Procedures
+                <div className="bg-card p-3 rounded-lg border border-border/80 shadow-2xs">
+                  <div className="font-bold text-xs text-foreground uppercase mb-2 flex items-center gap-1.5 tracking-wider">
+                    <Droplets className="w-3.5 h-3.5 text-primary" /> Procedures
                   </div>
                   <ul className="list-disc pl-4 text-xs space-y-1.5 text-foreground/90">
                     {procsAtDate.map((p, i) => <li key={i} className="leading-tight">{p.name}</li>)}
@@ -179,9 +179,9 @@ export function VisitSummary({ patientData }: VisitSummaryProps) {
 
               {/* Diagnoses */}
               {diagsAtDate.length > 0 && (
-                <div className="bg-purple-500/5 p-3 rounded-lg border border-purple-500/20">
-                  <div className="font-bold text-xs text-purple-600 uppercase mb-2 flex items-center gap-1.5 tracking-wider">
-                    <Activity className="w-3.5 h-3.5" /> Diagnoses
+                <div className="bg-card p-3 rounded-lg border border-border/80 shadow-2xs">
+                  <div className="font-bold text-xs text-foreground uppercase mb-2 flex items-center gap-1.5 tracking-wider">
+                    <Activity className="w-3.5 h-3.5 text-primary" /> Diagnoses
                   </div>
                   <ul className="list-disc pl-4 text-xs space-y-1.5 text-foreground/90">
                     {diagsAtDate.map((d, i) => <li key={i} className="leading-tight">{d.task}</li>)}
@@ -191,9 +191,9 @@ export function VisitSummary({ patientData }: VisitSummaryProps) {
 
               {/* Medications */}
               {medsAtDate.length > 0 && (
-                <div className="bg-amber-500/5 p-3 rounded-lg border border-amber-500/20">
-                  <div className="font-bold text-xs text-amber-600 uppercase mb-2 flex items-center gap-1.5 tracking-wider">
-                    <Pill className="w-3.5 h-3.5" /> Medications
+                <div className="bg-card p-3 rounded-lg border border-border/80 shadow-2xs">
+                  <div className="font-bold text-xs text-foreground uppercase mb-2 flex items-center gap-1.5 tracking-wider">
+                    <Pill className="w-3.5 h-3.5 text-primary" /> Medications
                   </div>
                   <ul className="list-disc pl-4 text-xs space-y-1.5 text-foreground/90">
                     {medsAtDate.map((m, i) => <li key={i} className="leading-tight">{m.task}</li>)}

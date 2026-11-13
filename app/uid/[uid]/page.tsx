@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import { loadPatientWithClinicalSummary } from "@/lib/services/patient-data.service";
 import {
@@ -8,14 +9,10 @@ import {
 	MetricConfig,
 	PatientClinicalSummary,
 } from "@/types/patient";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { DiseaseList } from "@/components/patient/disease-list";
-import { ProcedureList } from "@/components/patient/procedure-list";
+import { AppHeader } from "@/components/app-header";
 import { VisitSummary } from "@/components/patient/visit-summary";
-import { LineChart } from "@/components/charts/line-chart";
-import { GanttChart } from "@/components/charts/gantt-chart";
-import { ObservationCard } from "@/components/patient/observation-card";
-import { Badge } from "@/components/ui/badge";
+import { ClinicalMetricsView } from "@/components/charts/clinical-metrics-view";
+import { ObservationsView } from "@/components/patient/observations-view";
 import {
 	Sheet,
 	SheetContent,
@@ -33,21 +30,16 @@ import {
 } from "@/lib/utils/data-processing";
 import { resetProcedureColors } from "@/lib/utils/chart-utils";
 import Link from "next/link";
-import { ArrowLeft, Stethoscope, Pill, Eye, Layers, Activity, ScanLine, Droplets, Circle, Maximize, FileText } from "lucide-react";
+import { ArrowLeft, Stethoscope, Activity, Circle, FileText } from "lucide-react";
 
 export default function PatientDetailPage() {
 	const params = useParams();
-	const searchParams = useSearchParams();
 	const uid = params.uid as string;
 	const [patientData, setPatientData] = useState<PatientData | null>(null);
 	const [clinicalSummary, setClinicalSummary] =
 		useState<PatientClinicalSummary | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [selectedEye, setSelectedEye] = useState<"RE" | "LE" | "BE">(() => {
-		const eye = searchParams.get("eye");
-		if (eye === "LE" || eye === "BE") return eye;
-		return "RE";
-	});
+	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
 	useEffect(() => {
 		const loadData = async () => {
@@ -64,45 +56,55 @@ export default function PatientDetailPage() {
 		loadData();
 	}, [uid]);
 
-	// Calculate eye index
-	const eyeIndex = selectedEye === "RE" ? 0 : selectedEye === "LE" ? 1 : 2;
-
-	// Compute data based on patient and selected eye
+	// Compute bilateral data for patient without requiring eye toggle
 	const computedData = useMemo(() => {
 		if (!patientData) return null;
 		const mrno = patientData.p.mr;
 		const diseases = getDiseases(patientData);
-		const procedures = getProcedures(patientData, eyeIndex);
-		const diagnosisData = getGanttData(patientData, "diagnosis", eyeIndex);
-		const medicationsData = getMedicationsGanttData(patientData, eyeIndex);
-		const lensData = getGanttData(patientData, "lens", eyeIndex);
+
+		// Combine procedures across both eyes
+		const reProcedures = getProcedures(patientData, 0);
+		const leProcedures = getProcedures(patientData, 1);
+		const procedures = [
+			...reProcedures.map((p) => ({ ...p, item: `RE: ${p.item}` })),
+			...leProcedures.map((p) => ({ ...p, item: `LE: ${p.item}` })),
+		];
+
+		// Longitudinal chart data for RE, LE, and BE
+		const reChartData = getLineChartData(patientData, 0);
+		const leChartData = getLineChartData(patientData, 1);
+		const beChartData = getLineChartData(patientData, 2);
+
+		// Bilateral Gantt data (eyeIndex = 2 includes both eyes)
+		const diagnosisData = getGanttData(patientData, "diagnosis", 2);
+		const medicationsData = getMedicationsGanttData(patientData, 2);
+		const lensData = getGanttData(patientData, "lens", 2);
 		const backgroundRetinaData = getGanttData(
 			patientData,
 			"background_retina",
-			eyeIndex
+			2
 		);
 		const maculaFovealReflexData = getGanttData(
 			patientData,
 			"foveal_reflex",
-			eyeIndex
+			2
 		);
-		const conjunctivaData = getGanttData(patientData, "conjunctiva", eyeIndex);
-		const mediaData = getGanttData(patientData, "media", eyeIndex);
+		const conjunctivaData = getGanttData(patientData, "conjunctiva", 2);
+		const mediaData = getGanttData(patientData, "media", 2);
 		const anteriorChamberData = getGanttData(
 			patientData,
 			"anterior_chamber",
-			eyeIndex
+			2
 		);
-		const irisData = getGanttData(patientData, "iris", eyeIndex);
-		const discData = getGanttData(patientData, "disc", eyeIndex);
-		const pupilData = getGanttData(patientData, "pupil", eyeIndex);
-		const vesselsData = getGanttData(patientData, "vessels", eyeIndex);
+		const irisData = getGanttData(patientData, "iris", 2);
+		const discData = getGanttData(patientData, "disc", 2);
+		const pupilData = getGanttData(patientData, "pupil", 2);
+		const vesselsData = getGanttData(patientData, "vessels", 2);
 		const undilatedFundusData = getGanttData(
 			patientData,
 			"undilated_fundus",
-			eyeIndex
+			2
 		);
-		const lineChartData = getLineChartData(patientData, eyeIndex);
 
 		// Helper function to format summary text as bulleted list
 		const formatSummaryText = (text: string) => {
@@ -143,10 +145,11 @@ export default function PatientDetailPage() {
 			});
 
 			return (
-				<ul className="list-disc pl-5 space-y-2">
+				<ul className="list-disc pl-5 space-y-1.5">
 					{sections.map((section, idx) => (
-						<li key={idx}>
-							<strong>{section.heading}:</strong> {section.content}
+						<li key={idx} className="text-xs leading-relaxed text-slate-800 dark:text-slate-200">
+							<strong className="text-foreground font-bold">{section.heading}:</strong>{" "}
+							<span className="text-slate-800 dark:text-slate-200">{section.content}</span>
 						</li>
 					))}
 				</ul>
@@ -161,9 +164,12 @@ export default function PatientDetailPage() {
 
 			if (clinicalSummary.beSummary) {
 				summaryElements.push(
-					<div key="bilateral" className="mb-4">
-						<div className="font-bold mb-2 text-foreground">Bilateral</div>
-						<div className="pl-2">{clinicalSummary.beSummary}</div>
+					<div key="bilateral" className="space-y-1.5">
+						<div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#1176bc]">
+							<Circle className="w-2 h-2 fill-[#1176bc]" />
+							Bilateral
+						</div>
+						<div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-1">{clinicalSummary.beSummary}</div>
 					</div>
 				);
 			}
@@ -171,9 +177,12 @@ export default function PatientDetailPage() {
 			if (clinicalSummary.reSummary) {
 				const formattedRE = formatSummaryText(clinicalSummary.reSummary);
 				summaryElements.push(
-					<div key="re" className="mb-4">
-						<div className="font-bold mb-2 text-foreground">RE</div>
-						<div>{formattedRE}</div>
+					<div key="re" className="space-y-1.5">
+						<div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-800 dark:text-sky-300">
+							<Circle className="w-2 h-2 fill-sky-500" />
+							Right Eye (RE)
+						</div>
+						<div className="text-slate-800 dark:text-slate-200 pl-1">{formattedRE}</div>
 					</div>
 				);
 			}
@@ -181,39 +190,54 @@ export default function PatientDetailPage() {
 			if (clinicalSummary.leSummary) {
 				const formattedLE = formatSummaryText(clinicalSummary.leSummary);
 				summaryElements.push(
-					<div key="le" className="mb-4">
-						<div className="font-bold mb-2 text-foreground">LE</div>
-						<div>{formattedLE}</div>
+					<div key="le" className="space-y-1.5">
+						<div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300">
+							<Circle className="w-2 h-2 fill-purple-500" />
+							Left Eye (LE)
+						</div>
+						<div className="text-slate-800 dark:text-slate-200 pl-1">{formattedLE}</div>
 					</div>
 				);
 			}
 
 			if (clinicalSummary.clinicalNote) {
 				summaryElements.push(
-					<div key="clinical-note" className="mb-4">
-						<div className="font-bold mb-2 text-foreground">Clinical Note</div>
-						<div className="pl-2">{clinicalSummary.clinicalNote}</div>
+					<div key="clinical-note" className="space-y-1.5">
+						<div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-foreground">
+							<FileText className="w-3.5 h-3.5 text-[#1176bc]" />
+							Clinical Note
+						</div>
+						<div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-1">{clinicalSummary.clinicalNote}</div>
 					</div>
 				);
 			}
 
 			return summaryElements.length > 0 ? (
-				<div>{summaryElements}</div>
+				<div className="space-y-4 divide-y divide-border/60">
+					{summaryElements.map((el, i) => (
+						<div key={i} className={i > 0 ? "pt-3" : ""}>{el}</div>
+					))}
+				</div>
 			) : null;
 		};
 
 		const summary = getAllClinicalSummaries();
 
 		const hasLineChartData =
-			lineChartData.visualAcuityData.length > 0 ||
-			lineChartData.iopData.length > 0 ||
-			lineChartData.cmtData.length > 0 ||
-			lineChartData.procedures.length > 0;
+			reChartData.visualAcuityData.length > 0 ||
+			reChartData.iopData.length > 0 ||
+			reChartData.cmtData.length > 0 ||
+			leChartData.visualAcuityData.length > 0 ||
+			leChartData.iopData.length > 0 ||
+			leChartData.cmtData.length > 0;
 
 		return {
 			mrno,
 			diseases,
 			procedures,
+			reChartData,
+			leChartData,
+			beChartData,
 			diagnosisData,
 			medicationsData,
 			lensData,
@@ -227,18 +251,17 @@ export default function PatientDetailPage() {
 			pupilData,
 			vesselsData,
 			undilatedFundusData,
-			lineChartData,
 			summary,
 			hasLineChartData,
 		};
-	}, [patientData, eyeIndex, clinicalSummary]);
+	}, [patientData, clinicalSummary]);
 
 	const lineChartMetrics: MetricConfig[] = [
 		{
 			name: "Dist : BCVA / Near : BCVA",
-			color: "#4a9eff",
-			colorLight: "#e76e50",
-			colorDark: "#6bb6ff",
+			color: "#1176bc",
+			colorLight: "#2990d8",
+			colorDark: "#60a5fa",
 			min: -2.0,
 			max: 1.6,
 			step: 0.3,
@@ -246,9 +269,9 @@ export default function PatientDetailPage() {
 		},
 		{
 			name: "IOP",
-			color: "#4ade80",
-			colorLight: "#2a9d90",
-			colorDark: "#5fea9a",
+			color: "#0d9488",
+			colorLight: "#14b8a6",
+			colorDark: "#2dd4bf",
 			min: 0,
 			max: 20,
 			step: 5,
@@ -256,9 +279,9 @@ export default function PatientDetailPage() {
 		},
 		{
 			name: "CMT",
-			color: "#f472b6",
-			colorLight: "#f4a462",
-			colorDark: "#f78bc9",
+			color: "#4f46e5",
+			colorLight: "#6366f1",
+			colorDark: "#818cf8",
 			min: 0,
 			max: 1000,
 			step: 250,
@@ -305,341 +328,88 @@ export default function PatientDetailPage() {
 	};
 
 	return (
-		<>
-			<div className="h-screen w-full overflow-hidden bg-background flex flex-col animate-in fade-in duration-700">
-				{/* Sticky Top Header Row with Glassmorphism */}
-				<div className="flex items-center gap-3 px-4 py-3 border-b bg-background/80 backdrop-blur-md shadow-sm sticky top-0 z-10 shrink-0">
-					<div className="flex items-center justify-center bg-muted/50 rounded-md border px-4 py-2 font-medium shrink-0 shadow-inner">
-						{uid}
-					</div>
-					<div className="flex items-center justify-center bg-muted rounded-md border px-4 py-2 font-medium shrink-0 text-muted-foreground">
-						MR: {computedData.mrno}
-					</div>
+		<div className="min-h-screen lg:h-screen w-full lg:overflow-hidden bg-background flex flex-col animate-in fade-in duration-700">
+			{/* Top Header Bar */}
+			<AppHeader
+				showPatientInfo
+				patientUID={uid}
+				mrNo={computedData.mrno}
+			/>
 
-					<div className="ml-auto flex items-center shrink-0 mr-2 gap-2">
-						<Sheet>
-							<SheetTrigger asChild>
-								<button className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-semibold transition-colors shadow-sm">
-									<FileText className="w-4 h-4" />
-									<span className="hidden md:inline">Patient Context</span>
-								</button>
-							</SheetTrigger>
-							<SheetContent side="right" className="w-[400px] sm:w-[540px] border-l sm:max-w-none p-0 flex flex-col shadow-2xl">
-								<div className="p-6 border-b bg-muted/10 shrink-0">
-									<SheetHeader>
-										<SheetTitle className="text-2xl flex items-center gap-2">
-											<FileText className="w-6 h-6 text-primary" />
-											Patient Context
-										</SheetTitle>
-										<SheetDescription>
-											Detailed clinical summary.
-										</SheetDescription>
-									</SheetHeader>
-								</div>
-								<div className="p-6 flex-1 overflow-y-auto box-scroll space-y-8">
-									<div className="space-y-3">
-										<h3 className="font-semibold text-lg flex items-center gap-2 text-foreground">
-											<Stethoscope className="w-5 h-5 text-primary" />
-											Clinical Summary
-										</h3>
-										<div className="text-sm leading-relaxed text-muted-foreground bg-card p-5 rounded-xl border shadow-sm">
-											{computedData.summary || "No clinical summary available."}
-										</div>
-									</div>
-								</div>
-							</SheetContent>
-						</Sheet>
-
-						<Sheet>
-							<SheetTrigger asChild>
-								<button className="flex items-center gap-2 px-4 py-2 bg-background border hover:bg-muted rounded-md text-sm font-semibold transition-colors shadow-sm">
-									<Activity className="w-4 h-4" />
-									<span className="hidden md:inline">Visit & History</span>
-								</button>
-							</SheetTrigger>
-							<SheetContent side="right" className="w-[400px] sm:w-[540px] border-l sm:max-w-none p-0 flex flex-col shadow-2xl">
-								<div className="p-6 border-b bg-muted/10 shrink-0">
-									<SheetHeader>
-										<SheetTitle className="text-2xl flex items-center gap-2">
-											<Activity className="w-6 h-6 text-primary" />
-											Visit & History
-										</SheetTitle>
-										<SheetDescription>
-											Visit summary, systemic history, and procedures.
-										</SheetDescription>
-									</SheetHeader>
-								</div>
-								<div className="p-6 flex-1 overflow-y-auto box-scroll space-y-8">
-									<VisitSummary patientData={patientData} />
-									{computedData.diseases && computedData.diseases.length > 0 && (
-										<div className="space-y-3">
-											<h3 className="font-semibold text-lg flex items-center gap-2 text-foreground">
-												<Activity className="w-5 h-5 text-primary" />
-												Systemic History
-											</h3>
-											<div className="bg-card rounded-xl border shadow-sm p-4">
-												<DiseaseList diseases={computedData.diseases} compact />
-											</div>
-										</div>
-									)}
-									<div className="space-y-3 pb-8">
-										<h3 className="font-semibold text-lg flex items-center gap-2 text-foreground">
-											<Layers className="w-5 h-5 text-primary" />
-											Procedures
-										</h3>
-										<div className="bg-card p-5 rounded-xl border shadow-sm">
-											{computedData.procedures && computedData.procedures.length > 0 ? (
-												<ProcedureList procedures={computedData.procedures} compact />
-											) : (
-												<div className="text-sm text-muted-foreground text-center py-4">No procedures recorded.</div>
-											)}
-										</div>
-									</div>
-								</div>
-							</SheetContent>
-						</Sheet>
-					</div>
-
-					<div className="flex shrink-0 bg-muted/50 p-1 rounded-full shadow-inner border border-border/50">
-						{(["RE", "LE", "BE"] as const).map((eye) => (
-							<button
-								key={eye}
-								onClick={() => setSelectedEye(eye)}
-								className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-all duration-300 ${selectedEye === eye
-									? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
-									: "text-muted-foreground hover:text-foreground hover:bg-background/50"
-									}`}
-							>
-								{eye === "RE" ? "Right Eye" : eye === "LE" ? "Left Eye" : "Both Eyes"}
-							</button>
-						))}
-					</div>
-
-					<div className="flex items-center shrink-0 ml-2">
-						<ThemeToggle />
-					</div>
-				</div>
-
-
-
-				{/* Main Full-Width Content Area */}
-				<div className="flex-1 min-h-0 overflow-y-auto w-full">
-					<div className="w-full px-4 py-6 space-y-6">
-
-						{/* Line Chart Section - Always visible if data exists */}
-						{computedData.hasLineChartData && (
-							<div className="bg-card rounded-xl border shadow-sm overflow-hidden mb-6">
-								<div className="p-6">
-									<LineChart
-										key={`linechart-${selectedEye}`}
-										data={computedData.lineChartData}
-										metrics={lineChartMetrics}
-										showVA={true}
-										showIOP={true}
-										showCMT={true}
-										showProcedures={true}
-									/>
-								</div>
-							</div>
-						)}
-
-						<div className="mb-4 mt-10 animate-in slide-in-from-bottom-4 duration-500 delay-150 fill-mode-both">
-							<h3 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-								<span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-									Observations Dashboard
-								</span>
-							</h3>
-							{/* <p className="text-sm text-muted-foreground mt-1.5">Click on any card to open a full-screen detailed timeline view.</p> */}
-						</div>
-
-						{/* Observations Grid */}
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-10 animate-in slide-in-from-bottom-8 duration-700 delay-300 fill-mode-both">
-
-							{/* Diagnosis Timeline */}
-							{computedData.diagnosisData.length > 0 && (
-								<ObservationCard
-									title="Diagnoses"
-									summary={getGlimpse(computedData.diagnosisData)}
-									icon={Activity}
-									badgeCount={computedData.diagnosisData.length}
-								>
-									<GanttChart
-										data={computedData.diagnosisData}
-										title="Diagnoses"
-										barColorLight="#f4a462"
-										barColorDark="#e23670"
-									/>
-								</ObservationCard>
-							)}
-
-							{/* Medications Timeline */}
-							{computedData.medicationsData.length > 0 && (
-								<ObservationCard
-									title="Medications"
-									summary={getGlimpse(computedData.medicationsData)}
-									icon={Pill}
-									badgeCount={computedData.medicationsData.length}
-								>
-									<GanttChart
-										data={computedData.medicationsData}
-										title="Medications"
-										barColorLight="#e8c468"
-										barColorDark="#af57db"
-									/>
-								</ObservationCard>
-							)}
-
-							{/* Lens Observations */}
-							{computedData.lensData.length > 0 && (
-								<ObservationCard
-									title="Lens"
-									summary={getGlimpse(computedData.lensData)}
-									icon={Eye}
-									badgeCount={computedData.lensData.length}
-								>
-									<GanttChart data={computedData.lensData} title="Lens" />
-								</ObservationCard>
-							)}
-
-							{/* Background Retina */}
-							{computedData.backgroundRetinaData.length > 0 && (
-								<ObservationCard
-									title="Background Retina"
-									summary={getGlimpse(computedData.backgroundRetinaData)}
-									icon={Layers}
-									badgeCount={computedData.backgroundRetinaData.length}
-								>
-									<GanttChart
-										data={computedData.backgroundRetinaData}
-										title="Background Retina"
-									/>
-								</ObservationCard>
-							)}
-
-							{/* Macula Foveal Reflex */}
-							{computedData.maculaFovealReflexData.length > 0 && (
-								<ObservationCard
-									title="Macula Foveal Reflex"
-									summary={getGlimpse(computedData.maculaFovealReflexData)}
-									icon={ScanLine}
-									badgeCount={computedData.maculaFovealReflexData.length}
-								>
-									<GanttChart
-										data={computedData.maculaFovealReflexData}
-										title="Macula Foveal Reflex"
-									/>
-								</ObservationCard>
-							)}
-
-							{/* Conjunctiva */}
-							{computedData.conjunctivaData.length > 0 && (
-								<ObservationCard
-									title="Conjunctiva"
-									summary={getGlimpse(computedData.conjunctivaData)}
-									icon={Activity}
-									badgeCount={computedData.conjunctivaData.length}
-								>
-									<GanttChart
-										data={computedData.conjunctivaData}
-										title="Conjunctiva"
-									/>
-								</ObservationCard>
-							)}
-
-							{/* Media */}
-							{computedData.mediaData.length > 0 && (
-								<ObservationCard
-									title="Media"
-									summary={getGlimpse(computedData.mediaData)}
-									icon={Droplets}
-									badgeCount={computedData.mediaData.length}
-								>
-									<GanttChart data={computedData.mediaData} title="Media" />
-								</ObservationCard>
-							)}
-
-							{/* Anterior Chamber */}
-							{computedData.anteriorChamberData.length > 0 && (
-								<ObservationCard
-									title="Anterior Chamber"
-									summary={getGlimpse(computedData.anteriorChamberData)}
-									icon={Maximize}
-									badgeCount={computedData.anteriorChamberData.length}
-								>
-									<GanttChart
-										data={computedData.anteriorChamberData}
-										title="Anterior Chamber"
-									/>
-								</ObservationCard>
-							)}
-
-							{/* Iris */}
-							{computedData.irisData.length > 0 && (
-								<ObservationCard
-									title="Iris"
-									summary={getGlimpse(computedData.irisData)}
-									icon={Circle}
-									badgeCount={computedData.irisData.length}
-								>
-									<GanttChart data={computedData.irisData} title="Iris" />
-								</ObservationCard>
-							)}
-
-							{/* Disc */}
-							{computedData.discData.length > 0 && (
-								<ObservationCard
-									title="Disc"
-									summary={getGlimpse(computedData.discData)}
-									icon={Circle}
-									badgeCount={computedData.discData.length}
-								>
-									<GanttChart data={computedData.discData} title="Disc" />
-								</ObservationCard>
-							)}
-
-							{/* Pupil */}
-							{computedData.pupilData.length > 0 && (
-								<ObservationCard
-									title="Pupil"
-									summary={getGlimpse(computedData.pupilData)}
-									icon={Circle}
-									badgeCount={computedData.pupilData.length}
-								>
-									<GanttChart data={computedData.pupilData} title="Pupil" />
-								</ObservationCard>
-							)}
-
-							{/* Vessels */}
-							{computedData.vesselsData.length > 0 && (
-								<ObservationCard
-									title="Vessels"
-									summary={getGlimpse(computedData.vesselsData)}
-									icon={Activity}
-									badgeCount={computedData.vesselsData.length}
-								>
-									<GanttChart data={computedData.vesselsData} title="Vessels" />
-								</ObservationCard>
-							)}
-
-							{/* Undilated Fundus */}
-							{computedData.undilatedFundusData.length > 0 && (
-								<ObservationCard
-									title="Undilated Fundus"
-									summary={getGlimpse(computedData.undilatedFundusData)}
-									icon={Eye}
-									badgeCount={computedData.undilatedFundusData.length}
-								>
-									<GanttChart
-										data={computedData.undilatedFundusData}
-										title="Undilated Fundus"
-									/>
-								</ObservationCard>
-							)}
-
-						</div>
-					</div>
-				</div>
+			{/* Mobile Summary Toggle (below header) */}
+			<div className="lg:hidden flex items-center px-4 py-2 border-b bg-background shrink-0">
+				<button
+					onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+					className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold bg-background hover:bg-muted text-foreground transition-colors"
+					title="Toggle Patient Summary"
+				>
+					<Stethoscope className="w-3.5 h-3.5 text-[#1176bc]" />
+					<span>{mobileSidebarOpen ? "Hide Summary" : "Patient Summary"}</span>
+				</button>
 			</div>
-		</>
+
+			{/* Main Split-Screen Layout */}
+			<div className="flex-1 min-h-0 flex flex-col lg:flex-row w-full lg:overflow-hidden">
+
+				{/* LEFT SIDEBAR */}
+				<aside className={`w-full lg:w-[280px] xl:w-[300px] 2xl:w-[320px] shrink-0 border-b lg:border-b-0 lg:border-r border-[#cde1ef] dark:border-border bg-white dark:bg-card flex flex-col transition-all duration-200 ${
+					mobileSidebarOpen ? "block max-h-[360px] lg:max-h-none h-auto lg:h-full" : "hidden lg:flex lg:h-full"
+				}`}>
+					{/* Sidebar header with left/right padding */}
+					<div className="px-6 py-4 border-b border-[#cde1ef]/60 dark:border-border/60 flex items-center justify-between shrink-0">
+						<div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+							<Stethoscope className="w-4 h-4 text-[#1176bc]" />
+							<span>Patient Context</span>
+						</div>
+						<button
+							onClick={() => setMobileSidebarOpen(false)}
+							className="lg:hidden text-xs text-muted-foreground hover:text-foreground px-2 py-0.5 rounded border bg-muted/40"
+						>
+							Close
+						</button>
+					</div>
+
+					{/* Sidebar content with generous left/right padding */}
+					<div className="flex-1 overflow-y-auto box-scroll px-6 py-5 space-y-4">
+						<div className="space-y-2.5">
+							<p className="text-xs font-bold uppercase tracking-widest text-slate-700 dark:text-slate-300 flex items-center gap-2">
+								<FileText className="w-3.5 h-3.5 text-[#1176bc]" />
+								Clinical Status &amp; Course
+							</p>
+							{computedData.summary ? (
+								computedData.summary
+							) : (
+								<div className="text-xs text-muted-foreground px-3 py-2.5 rounded-lg border bg-muted/20">
+									No clinical summary recorded.
+								</div>
+							)}
+						</div>
+					</div>
+				</aside>
+
+				{/* RIGHT MAIN WORKSPACE */}
+				<main className="flex-1 min-h-0 overflow-y-auto box-scroll p-4 sm:p-5 lg:p-6 space-y-5 sm:space-y-6 w-full max-w-[3840px] mx-auto bg-[#dcebf5] dark:bg-background">
+
+					{/* Clinical Metrics */}
+					{computedData.hasLineChartData && (
+						<div className="w-full">
+							<ClinicalMetricsView
+								reData={computedData.reChartData}
+								leData={computedData.leChartData}
+								beData={computedData.beChartData}
+								metrics={lineChartMetrics}
+								defaultMode="matrix"
+							/>
+						</div>
+					)}
+
+					{/* Observations Dashboard */}
+					<ObservationsView
+						patientData={patientData}
+						computedData={computedData}
+					/>
+				</main>
+			</div>
+		</div>
 	);
 }

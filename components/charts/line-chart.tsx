@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
 	Line,
 	XAxis,
@@ -9,604 +9,758 @@ import {
 	CartesianGrid,
 	Tooltip,
 	ResponsiveContainer,
+	ReferenceLine,
 	LineChart as RechartsLineChart,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartData, MetricConfig, ProcedureData } from "@/types/patient";
-import { useTheme } from "next-themes";
-import { format, parseISO } from "date-fns";
-import { Syringe, Cookie, Flashlight, Scissors } from "lucide-react";
+import { format } from "date-fns";
+import {
+	Syringe,
+	Zap,
+	Scissors,
+	Activity,
+	Eye,
+	Droplets,
+	ScanLine,
+	Calendar,
+	CheckCircle2,
+	AlertCircle,
+} from "lucide-react";
 import { convertNumericToSnellen } from "@/lib/utils/vision-utils";
 
-
 interface LineChartProps {
-	data: ChartData;
-	metrics: MetricConfig[];
+	reData?: ChartData;
+	leData?: ChartData;
+	beData?: ChartData;
+	data?: ChartData;
+	metrics?: MetricConfig[];
 	showVA?: boolean;
 	showIOP?: boolean;
 	showCMT?: boolean;
 	showProcedures?: boolean;
+	selectedEye?: "BE" | "RE" | "LE";
+	hideCardWrapper?: boolean;
+}
+
+// Helper to safely format dates without throwing
+function formatDateSafe(dateStr?: string, formatStr: string = "dd MMM yyyy"): string {
+	if (!dateStr) return "—";
+	try {
+		const d = new Date(dateStr);
+		if (isNaN(d.getTime())) return dateStr;
+		return format(d, formatStr);
+	} catch {
+		return dateStr;
+	}
+}
+
+// Format numeric LogMAR value into standard clinical Snellen rating
+function formatVATick(v: number): string {
+	if (v >= 1.45) return "6/6";
+	if (v >= 1.15 && v <= 1.25) return "6/12";
+	if (v >= 0.85 && v <= 0.95) return "6/24";
+	if (v >= 0.45 && v <= 0.55) return "6/60";
+	if (v >= -0.15 && v <= 0.15) return "CF";
+	if (v <= -0.5) return "HM";
+	return convertNumericToSnellen(v);
 }
 
 export function LineChart({
-	data,
-	metrics,
+	reData: rawREData,
+	leData: rawLEData,
+	beData: rawBEData,
+	data: fallbackData,
 	showVA = true,
 	showIOP = true,
 	showCMT = true,
 	showProcedures = true,
+	selectedEye = "BE",
+	hideCardWrapper = true,
 }: LineChartProps) {
-	const { theme } = useTheme();
-	const [tooltipData, setTooltipData] = useState<{
-		visible: boolean;
-		x: number;
-		y: number;
-		procedure: ProcedureData | null;
-	}>({ visible: false, x: 0, y: 0, procedure: null });
+	const reSource = rawREData || fallbackData || { procedures: [], visualAcuityData: [], iopData: [], cmtData: [] };
+	const leSource = rawLEData || fallbackData || { procedures: [], visualAcuityData: [], iopData: [], cmtData: [] };
+	const beSource = rawBEData || { procedures: [], visualAcuityData: [], iopData: [], cmtData: [] };
 
-	const positionedProcedures = useMemo(() => {
-		if (!data.procedures.length) {
-			return [];
-		}
-
-		const chartDateStrings = Array.from(
+	// Chronologically sorted distinct date list across all eyes & modalities
+	const chartDateStrings = useMemo(() => {
+		return Array.from(
 			new Set([
-				...data.visualAcuityData.map((d) => d.x),
-				...data.iopData.map((d) => d.x),
-				...data.cmtData.map((d) => d.x),
+				...reSource.visualAcuityData.map((d) => d.x),
+				...reSource.iopData.map((d) => d.x),
+				...reSource.cmtData.map((d) => d.x),
+				...reSource.procedures.map((d) => d.date),
+				...leSource.visualAcuityData.map((d) => d.x),
+				...leSource.iopData.map((d) => d.x),
+				...leSource.cmtData.map((d) => d.x),
+				...leSource.procedures.map((d) => d.date),
+				...beSource.visualAcuityData.map((d) => d.x),
+				...beSource.iopData.map((d) => d.x),
+				...beSource.cmtData.map((d) => d.x),
+				...beSource.procedures.map((d) => d.date),
 			])
 		)
-			.filter((d) => !isNaN(new Date(d).getTime()))
-			.sort();
+			.filter((d) => d && !isNaN(new Date(d).getTime()))
+			.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+	}, [reSource, leSource, beSource]);
 
+	// Combined procedures with laterality tags
+	const combinedProcedures = useMemo(() => {
+		const procs: Array<ProcedureData & { eyeTag: "RE" | "LE" | "BE" }> = [];
+		reSource.procedures.forEach((p) => procs.push({ ...p, eyeTag: "RE" }));
+		leSource.procedures.forEach((p) => procs.push({ ...p, eyeTag: "LE" }));
+		beSource.procedures.forEach((p) => procs.push({ ...p, eyeTag: "BE" }));
+		return procs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+	}, [reSource, leSource, beSource]);
+
+	// Filtered procedures based on eye filter
+	const activeProcedures = useMemo(() => {
+		if (selectedEye === "RE") return combinedProcedures.filter((p) => p.eyeTag === "RE" || p.eyeTag === "BE");
+		if (selectedEye === "LE") return combinedProcedures.filter((p) => p.eyeTag === "LE" || p.eyeTag === "BE");
+		return combinedProcedures;
+	}, [combinedProcedures, selectedEye]);
+
+	// Unified dataset containing all tracks to synchronize crosshairs and tooltips
+	const unifiedData = useMemo(() => {
 		if (!chartDateStrings.length) return [];
 
-		const n = chartDateStrings.length;
-		const chartTimes = chartDateStrings.map((d) => new Date(d).getTime());
+		return chartDateStrings.map((date, idx) => {
+			const reVA = reSource.visualAcuityData.find((d) => d.x === date) || beSource.visualAcuityData.find((d) => d.x === date);
+			const leVA = leSource.visualAcuityData.find((d) => d.x === date) || beSource.visualAcuityData.find((d) => d.x === date);
 
-		const getProcedurePosition = (dateStr: string): number => {
-			const t = new Date(dateStr).getTime();
-			if (n === 1) return 50;
-			if (t <= chartTimes[0]) return 0;
-			if (t >= chartTimes[n - 1]) return 100;
+			const reIOP = reSource.iopData.find((d) => d.x === date) || beSource.iopData.find((d) => d.x === date);
+			const leIOP = leSource.iopData.find((d) => d.x === date) || beSource.iopData.find((d) => d.x === date);
 
-			for (let i = 0; i < n - 1; i++) {
-				if (t >= chartTimes[i] && t <= chartTimes[i + 1]) {
-					const frac =
-						(t - chartTimes[i]) / (chartTimes[i + 1] - chartTimes[i]);
-					return ((i + frac) / (n - 1)) * 100;
-				}
-			}
-			return 100;
-		};
+			const reCMT = reSource.cmtData.find((d) => d.x === date) || beSource.cmtData.find((d) => d.x === date);
+			const leCMT = leSource.cmtData.find((d) => d.x === date) || beSource.cmtData.find((d) => d.x === date);
 
-		const procedures = data.procedures.map((proc) => ({
-			...proc,
-			position: getProcedurePosition(proc.date),
-			offsetIndex: 0,
-		}));
+			const procsOnDate = activeProcedures.filter((p) => p.date === date);
 
-		procedures.sort((a, b) => a.position - b.position);
+			return {
+				date,
+				visitIndex: idx + 1,
+				reVA: reVA?.yNumeric ?? null,
+				reVALabel: reVA?.y ?? null,
+				reVASph: reVA?.sph ?? null,
+				leValue: leVA?.yNumeric ?? null,
+				leVALabel: leVA?.y ?? null,
+				leVASph: leVA?.sph ?? null,
+				reIOP: reIOP?.y ?? null,
+				leIOP: leIOP?.y ?? null,
+				reCMT: reCMT?.y ?? null,
+				leCMT: leCMT?.y ?? null,
+				procedures: procsOnDate,
+				hasProcedure: procsOnDate.length > 0,
+			};
+		});
+	}, [chartDateStrings, reSource, leSource, beSource, activeProcedures]);
 
-		const OVERLAP_THRESHOLD = 3;
+	// Calculate clinical Y ranges
+	const allVA = unifiedData
+		.flatMap((d) => [selectedEye !== "LE" ? d.reVA : null, selectedEye !== "RE" ? d.leValue : null])
+		.filter((v): v is number => v != null);
 
-		for (let i = 0; i < procedures.length; i++) {
-			const currentProc = procedures[i];
-			let maxOffsetInRange = 0;
+	const allIOP = unifiedData
+		.flatMap((d) => [selectedEye !== "LE" ? d.reIOP : null, selectedEye !== "RE" ? d.leIOP : null])
+		.filter((v): v is number => v != null);
 
-			for (let j = 0; j < i; j++) {
-				const prevProc = procedures[j];
-				const distance = Math.abs(currentProc.position - prevProc.position);
-
-				if (distance < OVERLAP_THRESHOLD) {
-					maxOffsetInRange = Math.max(
-						maxOffsetInRange,
-						prevProc.offsetIndex + 1
-					);
-				}
-			}
-
-			currentProc.offsetIndex = maxOffsetInRange;
-		}
-
-		return procedures;
-	}, [data]);
-
-
-	const isDark = theme === "dark";
-
-	// Prepare data for each chart
-	const vaChartData = data.visualAcuityData.map((d) => ({
-		date: d.x,
-		value: d.yNumeric,
-		label: d.y,
-		nv: d.nv,
-		sph: d.sph,
-		visData: d.visData,
-	}));
-	const iopChartData = data.iopData.map((d) => ({ date: d.x, value: d.y }));
-	const cmtChartData = data.cmtData.map((d) => ({ date: d.x, value: d.y }));
-
-	// Calculate dynamic ranges based on data
-	const vaValues = vaChartData.map((d) => d.value).filter((v) => v != null);
-	const iopValues = iopChartData.map((d) => d.value).filter((v) => v != null);
-	const cmtValues = cmtChartData.map((d) => d.value).filter((v) => v != null);
+	const allCMT = unifiedData
+		.flatMap((d) => [selectedEye !== "LE" ? d.reCMT : null, selectedEye !== "RE" ? d.leCMT : null])
+		.filter((v): v is number => v != null);
 
 	// VA range
-	const vaDataMin = vaValues.length ? Math.min(...vaValues) : 0.5;
-	const vaDataMax = vaValues.length ? Math.max(...vaValues) : 1.5;
-	const vaMin = Math.min(0.25, Math.floor(vaDataMin * 2) / 2 - 0.5);
-	const vaMax = Math.max(1.75, Math.ceil(vaDataMax * 2) / 2 + 0.5);
+	const minVA = allVA.length ? Math.min(...allVA) : 0.2;
+	const maxVA = allVA.length ? Math.max(...allVA) : 1.5;
+	const vaMin = Math.min(0.0, Math.floor(minVA * 2) / 2);
+	const vaMax = Math.max(1.5, Math.ceil(maxVA * 2) / 2);
+	const vaTicks = [0.0, 0.5, 0.9, 1.2, 1.5].filter((t) => t >= vaMin - 0.05 && t <= vaMax + 0.05);
 
 	// IOP range
-	const iopDataMin = iopValues.length ? Math.min(...iopValues) : 8;
-	const iopDataMax = iopValues.length ? Math.max(...iopValues) : 12;
-	const iopMin = Math.min(4, Math.floor((iopDataMin - 2) / 4) * 4);
-	const iopMax = Math.max(16, Math.ceil((iopDataMax + 2) / 4) * 4);
+	const maxIOP = allIOP.length ? Math.max(...allIOP) : 22;
+	const minIOP = allIOP.length ? Math.min(...allIOP) : 8;
+	const iopMin = Math.max(0, Math.min(6, Math.floor(minIOP / 4) * 4));
+	const iopMax = Math.max(26, Math.ceil((maxIOP + 2) / 4) * 4);
 
 	// CMT range
-	const cmtDataMax = cmtValues.length ? Math.max(...cmtValues) : 400;
+	const maxCMT = allCMT.length ? Math.max(...allCMT) : 320;
 	const cmtMin = 0;
-	const cmtMax = Math.max(500, Math.ceil(cmtDataMax / 500) * 500);
+	const cmtMax = Math.max(450, Math.ceil((maxCMT + 40) / 100) * 100);
 
-	// Walk backwards from the current date to find the most recent prior non-null value
-	const getPreviousValue = (
-		chartData: { date: string; value: number | null | undefined }[],
-		currentDate: string
-	): number | undefined => {
-		const idx = chartData.findIndex((p) => p.date === currentDate);
-		if (idx <= 0) return undefined;
-		for (let i = idx - 1; i >= 0; i--) {
-			if (chartData[i].value != null) return chartData[i].value as number;
-		}
-		return undefined;
+	// Geometry standards to guarantee 100% pixel-aligned vertical gridlines
+	const YAXIS_WIDTH = 68;
+	const CHART_HEIGHT = 145;
+	const SYNC_ID = "clinicalMetricsTrendSync";
+	const BASE_MARGIN = { top: 8, right: 30, left: 8, bottom: 4 };
+
+	// Determine which visible chart is at the bottom to render the date X-Axis
+	const isBottomMost = (metric: "VA" | "IOP" | "CMT") => {
+		if (metric === "CMT") return true;
+		if (metric === "IOP") return !showCMT;
+		if (metric === "VA") return !showCMT && !showIOP;
+		return false;
 	};
 
-	// Trend indicator: arrow + color based on direction and whether higher is better
-	const TrendIndicator = ({
-		current,
-		previous,
-		higherIsBetter,
-	}: {
-		current: number | null | undefined;
-		previous: number | null | undefined;
-		higherIsBetter: boolean;
-	}) => {
-		if (current == null || previous == null) return null;
-		if (current === previous)
-			return (
-				<span style={{ color: "#6b7280", fontWeight: 700, marginLeft: 4 }}>→</span>
-			);
-		const increased = current > previous;
-		const isImprovement = higherIsBetter ? increased : !increased;
-		const color = isImprovement ? "#22c55e" : "#ef4444";
-		const arrow = increased ? "↑" : "↓";
-		return (
-			<span style={{ color, fontWeight: 700, marginLeft: 4 }}>{arrow}</span>
-		);
-	};
+	// Unified clinical tooltip
+	const UnifiedTrendTooltip = ({ active, label }: any) => {
+		if (!active || !label) return null;
+		const item = unifiedData.find((d) => d.date === label);
+		if (!item) return null;
 
-	const VATooltip = ({ active, payload }: any) => {
-		if (!active || !payload || payload.length === 0) return null;
-		const d = payload[0].payload;
-		// console.log("📊 VA Tooltip data:", d);
 		return (
-			<div
-				className="bg-background border rounded-lg shadow-lg p-2 text-xs"
-				style={{
-					borderLeft: `4px solid ${isDark
-						? metrics[0]?.colorDark || "#666"
-						: metrics[0]?.colorLight || "#ccc"
-						}`,
-				}}
-			>
-				<p className="font-semibold mb-1 text-xs">
-					{format(parseISO(d.date), "dd MMM yyyy")}
-				</p>
-				<div className="flex items-center gap-1.5 mb-0.5">
-					<div
-						className="w-2 h-2 rounded-full"
-						style={{
-							backgroundColor: isDark
-								? metrics[0]?.colorDark || "#666"
-								: metrics[0]?.colorLight || "#ccc",
-						}}
-					/>
-					<span className="text-xs flex items-center gap-0.5">
-						VA: {convertNumericToSnellen(d.value)}
-						<TrendIndicator
-							current={d.value}
-							previous={getPreviousValue(vaChartData, d.date)}
-							higherIsBetter={true}
-						/>
-						{d.sph && d.sph.trim() && d.sph !== "-" && d.sph !== ";" && (
-							<span className="text-muted-foreground ml-1">Sph: {d.sph}</span>
-						)}
+			<div className="bg-popover/98 backdrop-blur-md border border-border/80 rounded-xl shadow-xl p-3 text-xs min-w-[260px] max-w-[340px] z-50 animate-in fade-in-0 duration-150">
+				{/* Header: Date + Visit number */}
+				<div className="flex items-center justify-between border-b border-border/60 pb-1.5 mb-2">
+					<div className="flex items-center gap-1.5">
+						<Calendar className="w-3.5 h-3.5 text-primary" />
+						<span className="font-bold text-foreground text-xs">
+							{formatDateSafe(item.date, "dd MMM yyyy")}
+						</span>
+					</div>
+					<span className="text-[10px] font-semibold text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+						Visit #{item.visitIndex} of {unifiedData.length}
 					</span>
 				</div>
-				{d.visData && Object.keys(d.visData).length > 0 && (
-					<div className="mt-1 pt-1 border-t border-border/50">
-						{Object.entries(d.visData).map(([key, val]: [string, any]) => (
-							<div key={key} className="flex items-center gap-1.5 text-xs">
-								<span className="text-muted-foreground">{key}:</span>
-								<span>{val}</span>
+
+				{/* Interventions / Procedures on this date */}
+				{item.procedures && item.procedures.length > 0 && (
+					<div className="mb-2 p-1.5 rounded-lg bg-primary/10 border border-primary/20 space-y-1">
+						<div className="text-[10px] font-bold text-primary uppercase tracking-wider flex items-center gap-1">
+							<Syringe className="w-3 h-3 text-primary" />
+							<span>Interventions Performed:</span>
+						</div>
+						{item.procedures.map((p, pIdx) => (
+							<div key={pIdx} className="flex items-center justify-between text-[11px] gap-2">
+								<span className="font-medium text-foreground break-words">{p.name}</span>
+								<span
+									className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${
+										p.eyeTag === "RE"
+											? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
+											: p.eyeTag === "LE"
+											? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+											: "bg-muted text-foreground"
+									}`}
+								>
+									{p.eyeTag}
+								</span>
 							</div>
 						))}
 					</div>
 				)}
-			</div>
-		);
-	};
 
-	const IOPTooltip = ({ active, payload }: any) => {
-		if (!active || !payload || payload.length === 0) return null;
-		const d = payload[0].payload;
-		return (
-			<div
-				className="bg-background border rounded-lg shadow-lg p-2 text-xs"
-				style={{
-					borderLeft: `4px solid ${isDark
-						? metrics[1]?.colorDark || "#666"
-						: metrics[1]?.colorLight || "#ccc"
-						}`,
-				}}
-			>
-				<p className="font-semibold mb-1 text-xs">
-					{format(parseISO(d.date), "dd MMM yyyy")}
-				</p>
-				<div className="flex items-center gap-1.5">
-					<div
-						className="w-2 h-2 rounded-full"
-						style={{
-							backgroundColor: isDark
-								? metrics[1]?.colorDark || "#666"
-								: metrics[1]?.colorLight || "#ccc",
-						}}
-					/>
-					<span className="text-xs flex items-center gap-0.5">
-						IOP: {d.value} mmHg
-						<TrendIndicator
-							current={d.value}
-							previous={getPreviousValue(iopChartData, d.date)}
-							higherIsBetter={false}
-						/>
-					</span>
-				</div>
-			</div>
-		);
-	};
-
-	const CMTTooltip = ({ active, payload }: any) => {
-		if (!active || !payload || payload.length === 0) return null;
-		const d = payload[0].payload;
-		return (
-			<div
-				className="bg-background border rounded-lg shadow-lg p-2 text-xs"
-				style={{
-					borderLeft: `4px solid ${isDark
-						? metrics[2]?.colorDark || "#666"
-						: metrics[2]?.colorLight || "#ccc"
-						}`,
-				}}
-			>
-				<p className="font-semibold mb-1 text-xs">
-					{format(parseISO(d.date), "dd MMM yyyy")}
-				</p>
-				<div className="flex items-center gap-1.5">
-					<div
-						className="w-2 h-2 rounded-full"
-						style={{
-							backgroundColor: isDark
-								? metrics[2]?.colorDark || "#666"
-								: metrics[2]?.colorLight || "#ccc",
-						}}
-					/>
-					<span className="text-xs flex items-center gap-0.5">
-						CMT: {d.value} µm
-						<TrendIndicator
-							current={d.value}
-							previous={getPreviousValue(cmtChartData, d.date)}
-							higherIsBetter={false}
-						/>
-					</span>
-				</div>
-			</div>
-		);
-	};
-
-	// Check if at least one metric is enabled
-	const hasAnyMetric = showVA || showIOP || showCMT;
-	const hasAnyData =
-		vaChartData.length > 0 ||
-		iopChartData.length > 0 ||
-		cmtChartData.length > 0 ||
-		positionedProcedures.length > 0;
-
-	if (!hasAnyData) {
-		return null;
-	}
-
-	if (!hasAnyMetric) {
-		return (
-			<Card className="overflow-visible">
-				<CardContent>
-					<div className="h-[400px] flex items-center justify-center">
-						<p className="text-muted-foreground">
-							Please enable at least one metric (VA, IOP, or CMT) to view the
-							chart
-						</p>
-					</div>
-				</CardContent>
-			</Card>
-		);
-	}
-
-	const handleProcedureMouseEnter = (
-		e: React.MouseEvent<HTMLDivElement>,
-		procedure: ProcedureData
-	) => {
-		const target = e.currentTarget;
-		const rect = target.getBoundingClientRect();
-		const containerRect = target
-			.closest(".procedures-overlay")
-			?.getBoundingClientRect();
-
-		if (!containerRect) return;
-
-		setTooltipData({
-			visible: true,
-			x: rect.left - containerRect.left + rect.width / 2,
-			y: rect.top - containerRect.top - 10,
-			procedure,
-		});
-	};
-
-	const handleProcedureMouseLeave = () => {
-		setTooltipData({ visible: false, x: 0, y: 0, procedure: null });
-	};
-
-	const chartHeight = 120;
-
-	// These must match the chart margin.left + YAxis width props below so the
-	// procedure overlay aligns exactly with the Recharts plot area.
-	const YAXIS_WIDTH = 50;
-	const CHART_MARGIN_LEFT = 20;
-	const CHART_MARGIN_RIGHT = 20;
-
-	return (
-		<Card className="overflow-visible">
-			<CardHeader className="pb-0 pt-2">
-				<CardTitle className="text-base">Visual Acuity, IOP, and CMT Trends</CardTitle>
-			</CardHeader>
-			<CardContent className="overflow-visible">
-				<div className="relative">
-					{/* Procedures Overlay */}
-					{showProcedures && positionedProcedures.length > 0 && (
-						<div
-							className="procedures-overlay absolute top-0 h-[30px] z-10"
-							style={{
-								left: `${CHART_MARGIN_LEFT + YAXIS_WIDTH}px`,
-								right: `${CHART_MARGIN_RIGHT}px`,
-							}}
-						>
-							{positionedProcedures.map((procedure, idx) => {
-								const Icon =
-									procedure.type === "injection"
-										? Syringe
-										: procedure.type === "laser"
-											? Cookie
-											: procedure.type === "surgery"
-												? Scissors
-												: Flashlight;
-								return (
-									<div
-										key={idx}
-										className="absolute top-0 cursor-pointer transition-transform hover:scale-110"
-										style={{
-											left: `calc(${procedure.position}% + ${procedure.offsetIndex * 20}px)`,
-											transform: "translateX(-50%)",
-										}}
-										onMouseEnter={(e) =>
-											handleProcedureMouseEnter(e, procedure)
-										}
-										onMouseLeave={handleProcedureMouseLeave}
-									>
-										<Icon
-											className="w-4 h-4"
-											style={{ color: procedure.color }}
-										/>
+				{/* Metrics Grid */}
+				<div className="space-y-1.5">
+					{/* VA */}
+					{showVA && (
+						<div className="p-1.5 rounded-md bg-muted/30 border border-border/40 space-y-0.5">
+							<div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
+								<span className="flex items-center gap-1">
+									<Eye className="w-3 h-3 text-primary" /> Visual Acuity (BCVA)
+								</span>
+							</div>
+							<div className="flex items-center justify-between text-[11px] font-mono">
+								{(selectedEye === "BE" || selectedEye === "RE") && (
+									<div className="flex items-center gap-1 text-sky-700 dark:text-sky-400 font-bold">
+										<span>RE:</span>
+										<span>{item.reVALabel || (item.reVA != null ? convertNumericToSnellen(item.reVA) : "—")}</span>
+										{item.reVASph && <span className="text-[9px] font-normal text-muted-foreground">({item.reVASph})</span>}
 									</div>
-								);
-							})}
+								)}
+								{selectedEye === "BE" && <span className="text-muted-foreground/30">|</span>}
+								{(selectedEye === "BE" || selectedEye === "LE") && (
+									<div className="flex items-center gap-1 text-purple-700 dark:text-purple-400 font-bold">
+										<span>LE:</span>
+										<span>{item.leVALabel || (item.leValue != null ? convertNumericToSnellen(item.leValue) : "—")}</span>
+										{item.leVASph && <span className="text-[9px] font-normal text-muted-foreground">({item.leVASph})</span>}
+									</div>
+								)}
+							</div>
+						</div>
+					)}
 
-							{/* Tooltip */}
-							{tooltipData.visible && tooltipData.procedure && (
+					{/* IOP */}
+					{showIOP && (
+						<div className="p-1.5 rounded-md bg-muted/30 border border-border/40 space-y-0.5">
+							<div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
+								<span className="flex items-center gap-1">
+									<Droplets className="w-3 h-3 text-primary" /> IOP (mmHg)
+								</span>
+								<span className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">Safe: 10–21 mmHg</span>
+							</div>
+							<div className="flex items-center justify-between text-[11px] font-mono">
+								{(selectedEye === "BE" || selectedEye === "RE") && (
+									<div
+										className={`flex items-center gap-1 font-bold ${
+											item.reIOP && item.reIOP > 21
+												? "text-amber-600 dark:text-amber-400"
+												: "text-sky-700 dark:text-sky-400"
+										}`}
+									>
+										<span>RE:</span>
+										<span>{item.reIOP != null ? `${item.reIOP} mmHg` : "—"}</span>
+										{item.reIOP && item.reIOP > 21 && (
+											<AlertCircle className="w-2.5 h-2.5 text-amber-500 ml-0.5" />
+										)}
+									</div>
+								)}
+								{selectedEye === "BE" && <span className="text-muted-foreground/30">|</span>}
+								{(selectedEye === "BE" || selectedEye === "LE") && (
+									<div
+										className={`flex items-center gap-1 font-bold ${
+											item.leIOP && item.leIOP > 21
+												? "text-amber-600 dark:text-amber-400"
+												: "text-purple-700 dark:text-purple-400"
+										}`}
+									>
+										<span>LE:</span>
+										<span>{item.leIOP != null ? `${item.leIOP} mmHg` : "—"}</span>
+										{item.leIOP && item.leIOP > 21 && (
+											<AlertCircle className="w-2.5 h-2.5 text-amber-500 ml-0.5" />
+										)}
+									</div>
+								)}
+							</div>
+						</div>
+					)}
+
+					{/* CMT */}
+					{showCMT && (
+						<div className="p-1.5 rounded-md bg-muted/30 border border-border/40 space-y-0.5">
+							<div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
+								<span className="flex items-center gap-1">
+									<ScanLine className="w-3 h-3 text-primary" /> Macular Thickness (CMT)
+								</span>
+								<span className="text-[9px] text-muted-foreground font-medium">Normal: ≤ 280 µm</span>
+							</div>
+							<div className="flex items-center justify-between text-[11px] font-mono">
+								{(selectedEye === "BE" || selectedEye === "RE") && (
+									<div
+										className={`flex items-center gap-1 font-bold ${
+											item.reCMT && item.reCMT > 280
+												? "text-primary dark:text-[#2990d8]"
+												: "text-sky-700 dark:text-sky-400"
+										}`}
+									>
+										<span>RE:</span>
+										<span>{item.reCMT != null ? `${item.reCMT} µm` : "—"}</span>
+										{item.reCMT && item.reCMT > 280 && (
+											<span className="text-[9px] font-medium text-amber-600 ml-0.5">(Edema)</span>
+										)}
+									</div>
+								)}
+								{selectedEye === "BE" && <span className="text-muted-foreground/30">|</span>}
+								{(selectedEye === "BE" || selectedEye === "LE") && (
+									<div
+										className={`flex items-center gap-1 font-bold ${
+											item.leCMT && item.leCMT > 280
+												? "text-primary dark:text-[#2990d8]"
+												: "text-purple-700 dark:text-purple-400"
+										}`}
+									>
+										<span>LE:</span>
+										<span>{item.leCMT != null ? `${item.leCMT} µm` : "—"}</span>
+										{item.leCMT && item.leCMT > 280 && (
+											<span className="text-[9px] font-medium text-amber-600 ml-0.5">(Edema)</span>
+										)}
+									</div>
+								)}
+							</div>
+						</div>
+					)}
+				</div>
+			</div>
+		);
+	};
+
+	if (!unifiedData.length) {
+		return (
+			<div className="p-8 text-center text-muted-foreground text-xs italic bg-muted/20 rounded-lg border border-border/60">
+				No longitudinal visual metric observations recorded.
+			</div>
+		);
+	}
+
+	const content = (
+		<div className="space-y-3.5 select-none">
+			{/* Interventions & Procedures Timeline Ribbon */}
+			{showProcedures && activeProcedures.length > 0 && (
+				<div className="p-2.5 rounded-lg bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-1.5 shadow-2xs">
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+							<Syringe className="w-3.5 h-3.5 text-primary" />
+							<span>Interventions & Procedures Timeline ({activeProcedures.length})</span>
+						</div>
+						<span className="text-[10px] text-muted-foreground font-medium hidden sm:inline">
+							Hover any curve or date to view synchronized metrics
+						</span>
+					</div>
+					<div className="flex items-center gap-1.5 overflow-x-auto box-scroll pb-1">
+						{activeProcedures.map((proc, idx) => {
+							const Icon =
+								proc.type === "injection"
+									? Syringe
+									: proc.type === "laser"
+									? Zap
+									: proc.type === "surgery"
+									? Scissors
+									: Activity;
+							return (
 								<div
-									className="absolute pointer-events-none z-50 animate-in fade-in-0 zoom-in-95 duration-200"
-									style={{
-										left: `${tooltipData.x}px`,
-										top: `${tooltipData.y}px`,
-										transform: "translateX(-30%) translateY(80%)",
-									}}
+									key={idx}
+									className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-card border border-border/70 text-xs shadow-2xs whitespace-nowrap shrink-0 hover:border-primary/50 transition-colors"
 								>
 									<div
-										className="bg-background border rounded-lg shadow-lg p-2 text-xs whitespace-nowrap"
-										style={{
-											borderLeft: `4px solid ${tooltipData.procedure.color}`,
-										}}
+										className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
+										style={{ backgroundColor: `${proc.color || "#0284c7"}18`, color: proc.color || "#0284c7" }}
 									>
-										<div className="font-semibold mb-0.5 text-xs">
-											{tooltipData.procedure.name}
-										</div>
-										<div className="text-muted-foreground text-xs">
-											{format(
-												parseISO(tooltipData.procedure.date),
-												"MMM d, yyyy"
-											)}
-										</div>
-										{tooltipData.procedure.count &&
-											tooltipData.procedure.count > 1 && (
-												<div className="text-muted-foreground text-xs mt-0.5 italic">
-													Occurred {tooltipData.procedure.count} times
-												</div>
-											)}
+										<Icon className="w-2.5 h-2.5" />
 									</div>
+									<span className="font-semibold text-foreground text-[11px]">{proc.name}</span>
+									<span
+										className={`px-1 py-0.2 rounded text-[9px] font-bold ${
+											proc.eyeTag === "RE"
+												? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
+												: proc.eyeTag === "LE"
+												? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+												: "bg-muted text-foreground"
+										}`}
+									>
+										{proc.eyeTag}
+									</span>
+									<span className="text-[10px] text-muted-foreground font-mono">
+										{formatDateSafe(proc.date, "dd MMM yy")}
+									</span>
 								</div>
+							);
+						})}
+					</div>
+				</div>
+			)}
+
+			{/* ========================================================================= */}
+			{/* 1. VISUAL ACUITY (BCVA) CHART TRACK                                       */}
+			{/* ========================================================================= */}
+			{showVA && (
+				<div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
+					{/* Track Header */}
+					<div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-50/80 dark:bg-slate-900/60 border-b border-border/70 text-xs">
+						<div className="flex items-center gap-2">
+							<Eye className="w-3.5 h-3.5 text-primary" />
+							<span className="font-bold text-foreground">Visual Acuity (BCVA)</span>
+						</div>
+						<div className="flex items-center gap-3 text-[11px]">
+							{(selectedEye === "BE" || selectedEye === "RE") && (
+								<span className="flex items-center gap-1.5 text-foreground font-semibold">
+									<span className="w-3 h-0.5 bg-sky-600 rounded-full inline-block" /> RE (Right Eye)
+								</span>
+							)}
+							{(selectedEye === "BE" || selectedEye === "LE") && (
+								<span className="flex items-center gap-1.5 text-foreground font-semibold">
+									<span className="w-3 h-0.5 bg-purple-600 border-b border-dashed rounded-full inline-block" /> LE (Left Eye)
+								</span>
 							)}
 						</div>
-					)}
+					</div>
 
-					{/* Visual Acuity Chart */}
-					{showVA && vaChartData.length > 0 && (
-						<div className="pt-[45px]">
-							<ResponsiveContainer width="100%" height={chartHeight}>
-								<RechartsLineChart
-									data={vaChartData}
-									margin={{ top: 5, right: 20, bottom: 0, left: 20 }}
-								>
-									<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-									<XAxis dataKey="date" hide />
-									<YAxis
-										width={YAXIS_WIDTH}
-										domain={[vaMin, vaMax]}
-										tick={{ fontSize: 11 }}
-										tickFormatter={(v) => v.toFixed(1)}
-									/>
-									<Tooltip content={(props: any) => <VATooltip {...props} />} cursor={false} />
+					{/* Recharts Canvas */}
+					<div className="p-1 pt-2">
+						<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+							<RechartsLineChart
+								syncId={SYNC_ID}
+								data={unifiedData}
+								margin={
+									isBottomMost("VA")
+										? { ...BASE_MARGIN, bottom: 24 }
+										: BASE_MARGIN
+								}
+							>
+								<CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+								<XAxis
+									dataKey="date"
+									hide={!isBottomMost("VA")}
+									tickFormatter={(date) => formatDateSafe(date, "MMM yy")}
+									tick={{ fontSize: 10, fill: "currentColor" }}
+									interval="preserveStartEnd"
+								/>
+								<YAxis
+									width={YAXIS_WIDTH}
+									domain={[vaMin, vaMax]}
+									ticks={vaTicks}
+									tick={{ fontSize: 10, fill: "currentColor" }}
+									tickFormatter={formatVATick}
+								/>
+								<Tooltip content={(props: any) => <UnifiedTrendTooltip {...props} />} />
+
+								{/* Subtle vertical milestone lines for procedures */}
+								{showProcedures &&
+									unifiedData
+										.filter((d) => d.hasProcedure)
+										.map((d) => (
+											<ReferenceLine
+												key={`proc-va-${d.date}`}
+												x={d.date}
+												stroke="#818cf8"
+												strokeDasharray="2 2"
+												strokeWidth={1}
+												strokeOpacity={0.5}
+											/>
+										))}
+
+								{/* Right Eye Line (Sky Blue, solid) */}
+								{(selectedEye === "BE" || selectedEye === "RE") && (
 									<Line
 										type="monotone"
-										dataKey="value"
-										stroke={
-											isDark
-												? metrics[0]?.colorDark || "#666"
-												: metrics[0]?.colorLight || "#ccc"
-										}
-										strokeWidth={2}
-										dot={{ r: 4 }}
+										dataKey="reVA"
+										stroke="#0284c7"
+										strokeWidth={2.2}
+										dot={{ r: 3, fill: "#0284c7", stroke: "#ffffff", strokeWidth: 1.5 }}
+										activeDot={{ r: 5, fill: "#0284c7", stroke: "#ffffff", strokeWidth: 2 }}
 										connectNulls
+										name="RE"
 									/>
-								</RechartsLineChart>
-							</ResponsiveContainer>
-						</div>
-					)}
+								)}
 
-					{/* IOP Chart */}
-					{showIOP && iopChartData.length > 0 && (
-						<div
-							className={
-								showVA && vaChartData.length > 0 ? "mt-0" : "pt-[45px]"
-							}
-						>
-							<ResponsiveContainer width="100%" height={chartHeight}>
-								<RechartsLineChart
-									data={iopChartData}
-									margin={{ top: 5, right: 20, bottom: 0, left: 20 }}
-								>
-									<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-									<XAxis dataKey="date" hide />
-									<YAxis width={YAXIS_WIDTH} domain={[iopMin, iopMax]} tick={{ fontSize: 11 }} />
-									<Tooltip content={(props: any) => <IOPTooltip {...props} />} cursor={false} />
+								{/* Left Eye Line (Purple, dashed) */}
+								{(selectedEye === "BE" || selectedEye === "LE") && (
 									<Line
 										type="monotone"
-										dataKey="value"
-										stroke={
-											isDark
-												? metrics[1]?.colorDark || "#666"
-												: metrics[1]?.colorLight || "#ccc"
-										}
-										strokeWidth={2}
-										dot={{ r: 4 }}
+										dataKey="leValue"
+										stroke="#9333ea"
+										strokeWidth={2.2}
+										strokeDasharray="5 5"
+										dot={{ r: 3, fill: "#9333ea", stroke: "#ffffff", strokeWidth: 1.5 }}
+										activeDot={{ r: 5, fill: "#9333ea", stroke: "#ffffff", strokeWidth: 2 }}
 										connectNulls
+										name="LE"
 									/>
-								</RechartsLineChart>
-							</ResponsiveContainer>
-						</div>
-					)}
-
-					{/* CMT Chart */}
-					{showCMT && cmtChartData.length > 0 && (
-						<div
-							className={
-								(showVA && vaChartData.length > 0) ||
-									(showIOP && iopChartData.length > 0)
-									? "mt-0"
-									: "pt-[45px]"
-							}
-						>
-							<ResponsiveContainer width="100%" height={chartHeight}>
-								<RechartsLineChart
-									data={cmtChartData}
-									margin={{ top: 5, right: 20, bottom: 20, left: 20 }}
-								>
-									<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-									<XAxis
-										dataKey="date"
-										tickFormatter={(date) => format(parseISO(date), "MMM yy")}
-										tick={{ fontSize: 12 }}
-									/>
-									<YAxis width={YAXIS_WIDTH} domain={[cmtMin, cmtMax]} tick={{ fontSize: 11 }} />
-									<Tooltip content={(props: any) => <CMTTooltip {...props} />} cursor={false} />
-									<Line
-										type="monotone"
-										dataKey="value"
-										stroke={
-											isDark
-												? metrics[2]?.colorDark || "#666"
-												: metrics[2]?.colorLight || "#ccc"
-										}
-										strokeWidth={2}
-										dot={{ r: 4 }}
-										connectNulls
-									/>
-								</RechartsLineChart>
-							</ResponsiveContainer>
-						</div>
-					)}
+								)}
+							</RechartsLineChart>
+						</ResponsiveContainer>
+					</div>
 				</div>
+			)}
 
-				{/* Legend */}
-				{/* <div className="flex flex-wrap gap-4 mt-4 justify-center">
-					{showVA && (
+			{/* ========================================================================= */}
+			{/* 2. INTRAOCULAR PRESSURE (IOP) CHART TRACK                                 */}
+			{/* ========================================================================= */}
+			{showIOP && (
+				<div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
+					{/* Track Header */}
+					<div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-50/80 dark:bg-slate-900/60 border-b border-border/70 text-xs">
 						<div className="flex items-center gap-2">
-							<div
-								className="w-3 h-3 rounded-full"
-								style={{
-									backgroundColor: isDark
-										? metrics[0]?.colorDark || "#666"
-										: metrics[0]?.colorLight || "#ccc",
-								}}
-							/>
-							<span className="text-sm">Visual Acuity</span>
+							<Droplets className="w-3.5 h-3.5 text-primary" />
+							<span className="font-bold text-foreground">Intraocular Pressure (IOP)</span>
+							{/* <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+								Safe Range: 10 – 21 mmHg
+							</span> */}
 						</div>
-					)}
-					{showIOP && (
+						<div className="flex items-center gap-3 text-[11px]">
+							{(selectedEye === "BE" || selectedEye === "RE") && (
+								<span className="flex items-center gap-1.5 text-foreground font-semibold">
+									<span className="w-3 h-0.5 bg-sky-600 rounded-full inline-block" /> RE (Right Eye)
+								</span>
+							)}
+							{(selectedEye === "BE" || selectedEye === "LE") && (
+								<span className="flex items-center gap-1.5 text-foreground font-semibold">
+									<span className="w-3 h-0.5 bg-purple-600 border-b border-dashed rounded-full inline-block" /> LE (Left Eye)
+								</span>
+							)}
+						</div>
+					</div>
+
+					{/* Recharts Canvas */}
+					<div className="p-1 pt-2">
+						<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+							<RechartsLineChart
+								syncId={SYNC_ID}
+								data={unifiedData}
+								margin={
+									isBottomMost("IOP")
+										? { ...BASE_MARGIN, bottom: 24 }
+										: BASE_MARGIN
+								}
+							>
+								<CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+								<XAxis
+									dataKey="date"
+									hide={!isBottomMost("IOP")}
+									tickFormatter={(date) => formatDateSafe(date, "MMM yy")}
+									tick={{ fontSize: 10, fill: "currentColor" }}
+									interval="preserveStartEnd"
+								/>
+								<YAxis
+									width={YAXIS_WIDTH}
+									domain={[iopMin, iopMax]}
+									tick={{ fontSize: 10, fill: "currentColor" }}
+									tickFormatter={(v) => `${v}`}
+								/>
+								<Tooltip content={(props: any) => <UnifiedTrendTooltip {...props} />} />
+
+								{/* Subtle vertical milestone lines for procedures */}
+								{showProcedures &&
+									unifiedData
+										.filter((d) => d.hasProcedure)
+										.map((d) => (
+											<ReferenceLine
+												key={`proc-iop-${d.date}`}
+												x={d.date}
+												stroke="#818cf8"
+												strokeDasharray="2 2"
+												strokeWidth={1}
+												strokeOpacity={0.5}
+											/>
+										))}
+
+								{/* Right Eye Line */}
+								{(selectedEye === "BE" || selectedEye === "RE") && (
+									<Line
+										type="monotone"
+										dataKey="reIOP"
+										stroke="#0284c7"
+										strokeWidth={2.2}
+										dot={{ r: 3, fill: "#0284c7", stroke: "#ffffff", strokeWidth: 1.5 }}
+										activeDot={{ r: 5, fill: "#0284c7", stroke: "#ffffff", strokeWidth: 2 }}
+										connectNulls
+										name="RE"
+									/>
+								)}
+
+								{/* Left Eye Line */}
+								{(selectedEye === "BE" || selectedEye === "LE") && (
+									<Line
+										type="monotone"
+										dataKey="leIOP"
+										stroke="#9333ea"
+										strokeWidth={2.2}
+										strokeDasharray="5 5"
+										dot={{ r: 3, fill: "#9333ea", stroke: "#ffffff", strokeWidth: 1.5 }}
+										activeDot={{ r: 5, fill: "#9333ea", stroke: "#ffffff", strokeWidth: 2 }}
+										connectNulls
+										name="LE"
+									/>
+								)}
+							</RechartsLineChart>
+						</ResponsiveContainer>
+					</div>
+				</div>
+			)}
+
+			{/* ========================================================================= */}
+			{/* 3. CENTRAL MACULAR THICKNESS (CMT) CHART TRACK                           */}
+			{/* ========================================================================= */}
+			{showCMT && (
+				<div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
+					{/* Track Header */}
+					<div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-50/80 dark:bg-slate-900/60 border-b border-border/70 text-xs">
 						<div className="flex items-center gap-2">
-							<div
-								className="w-3 h-3 rounded-full"
-								style={{
-									backgroundColor: isDark
-										? metrics[1]?.colorDark || "#666"
-										: metrics[1]?.colorLight || "#ccc",
-								}}
-							/>
-							<span className="text-sm">IOP (mmHg)</span>
+							<ScanLine className="w-3.5 h-3.5 text-primary" />
+							<span className="font-bold text-foreground">Central Macular Thickness (CMT)</span>
+							{/* <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+								Normal Limit: ≤ 280 µm
+							</span> */}
 						</div>
-					)}
-					{showCMT && (
-						<div className="flex items-center gap-2">
-							<div
-								className="w-3 h-3 rounded-full"
-								style={{
-									backgroundColor: isDark
-										? metrics[2]?.colorDark || "#666"
-										: metrics[2]?.colorLight || "#ccc",
-								}}
-							/>
-							<span className="text-sm">CMT (µm)</span>
+						<div className="flex items-center gap-3 text-[11px]">
+							{(selectedEye === "BE" || selectedEye === "RE") && (
+								<span className="flex items-center gap-1.5 text-foreground font-semibold">
+									<span className="w-3 h-0.5 bg-sky-600 rounded-full inline-block" /> RE (Right Eye)
+								</span>
+							)}
+							{(selectedEye === "BE" || selectedEye === "LE") && (
+								<span className="flex items-center gap-1.5 text-foreground font-semibold">
+									<span className="w-3 h-0.5 bg-purple-600 border-b border-dashed rounded-full inline-block" /> LE (Left Eye)
+								</span>
+							)}
 						</div>
-					)}
-				</div> */}
-			</CardContent>
+					</div>
+
+					{/* Recharts Canvas */}
+					<div className="p-1 pt-2">
+						<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+							<RechartsLineChart
+								syncId={SYNC_ID}
+								data={unifiedData}
+								margin={
+									isBottomMost("CMT")
+										? { ...BASE_MARGIN, bottom: 24 }
+										: BASE_MARGIN
+								}
+							>
+								<CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+								<XAxis
+									dataKey="date"
+									hide={!isBottomMost("CMT")}
+									tickFormatter={(date) => formatDateSafe(date, "MMM yy")}
+									tick={{ fontSize: 10, fill: "currentColor" }}
+									interval="preserveStartEnd"
+								/>
+								<YAxis
+									width={YAXIS_WIDTH}
+									domain={[cmtMin, cmtMax]}
+									tick={{ fontSize: 10, fill: "currentColor" }}
+									tickFormatter={(v) => `${v}`}
+								/>
+								<Tooltip content={(props: any) => <UnifiedTrendTooltip {...props} />} />
+
+								{/* Subtle vertical milestone lines for procedures */}
+								{showProcedures &&
+									unifiedData
+										.filter((d) => d.hasProcedure)
+										.map((d) => (
+											<ReferenceLine
+												key={`proc-cmt-${d.date}`}
+												x={d.date}
+												stroke="#818cf8"
+												strokeDasharray="2 2"
+												strokeWidth={1}
+												strokeOpacity={0.5}
+											/>
+										))}
+
+								{/* Right Eye Line */}
+								{(selectedEye === "BE" || selectedEye === "RE") && (
+									<Line
+										type="monotone"
+										dataKey="reCMT"
+										stroke="#0284c7"
+										strokeWidth={2.2}
+										dot={{ r: 3, fill: "#0284c7", stroke: "#ffffff", strokeWidth: 1.5 }}
+										activeDot={{ r: 5, fill: "#0284c7", stroke: "#ffffff", strokeWidth: 2 }}
+										connectNulls
+										name="RE"
+									/>
+								)}
+
+								{/* Left Eye Line */}
+								{(selectedEye === "BE" || selectedEye === "LE") && (
+									<Line
+										type="monotone"
+										dataKey="leCMT"
+										stroke="#9333ea"
+										strokeWidth={2.2}
+										strokeDasharray="5 5"
+										dot={{ r: 3, fill: "#9333ea", stroke: "#ffffff", strokeWidth: 1.5 }}
+										activeDot={{ r: 5, fill: "#9333ea", stroke: "#ffffff", strokeWidth: 2 }}
+										connectNulls
+										name="LE"
+									/>
+								)}
+							</RechartsLineChart>
+						</ResponsiveContainer>
+					</div>
+				</div>
+			)}
+		</div>
+	);
+
+	if (hideCardWrapper) {
+		return content;
+	}
+
+	return (
+		<Card className="overflow-hidden">
+			<CardHeader className="pb-1 pt-3">
+				<CardTitle className="text-sm font-bold">Bilateral Visual Acuity, IOP, and CMT Trends</CardTitle>
+			</CardHeader>
+			<CardContent className="p-3">{content}</CardContent>
 		</Card>
 	);
 }

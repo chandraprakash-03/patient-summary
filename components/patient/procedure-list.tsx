@@ -47,8 +47,8 @@ export function ProcedureList({
 						return (
 							<tr key={index}>
 								<td className="px-2 py-2.5 border-b">
-									<div className="flex items-center gap-1.5" style={{ color }}>
-										<Icon className="h-4 w-4" />
+									<div className="flex items-center gap-1.5 text-foreground font-medium">
+										<Icon className="h-4 w-4 text-primary shrink-0" />
 										<span className="whitespace-nowrap">{procedure.type}</span>
 									</div>
 								</td>
@@ -85,10 +85,9 @@ export function ProcedureList({
 								className="flex items-center gap-3 p-2 rounded-md bg-muted/50"
 							>
 								<div
-									className="p-2 rounded-md"
-									style={{ backgroundColor: `${color}20` }}
+									className="p-2 rounded-md bg-muted text-primary"
 								>
-									<Icon className="h-4 w-4" style={{ color }} />
+									<Icon className="h-4 w-4" />
 								</div>
 								<div className="flex-1">
 									<p className="text-sm font-medium">{procedure.item}</p>

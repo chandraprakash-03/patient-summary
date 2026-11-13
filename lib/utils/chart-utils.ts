@@ -82,6 +82,18 @@ export function extractCMTFromText(text: string): {
  * Normalize condition name for consistent grouping
  */
 export function normalizeConditionName(name: string): string {
+	if (!name) return "";
+	const lower = name.trim().toLowerCase();
+	if (
+		lower === "null" ||
+		lower === "nil" ||
+		lower === "none" ||
+		lower === "nan" ||
+		lower === "-" ||
+		lower === "0"
+	) {
+		return "";
+	}
 	return name
 		.trim()
 		.replace(/\s+/g, " ")
@@ -127,21 +139,16 @@ export function isProcedurePlaceholder(proc: string): boolean {
  */
 const procedureColorMap = new Map<string, string>();
 const colorPalette: string[] = [
-	"#00bcd4", // Cyan
-	"#4ade80", // Green
-	"#06b6d4", // Teal
-	"#8b5cf6", // Purple
-	"#f472b6", // Pink
-	"#ef4444", // Red
-	"#f97316", // Orange
-	"#eab308", // Yellow
+	"#0284c7", // Clinical Sky Blue
+	"#0d9488", // Clinical Teal
+	"#4f46e5", // Clinical Indigo
+	"#2563eb", // Royal Clinical Blue
+	"#0891b2", // Cyan / Slate Teal
+	"#6366f1", // Soft Indigo
+	"#475569", // Slate
 	"#3b82f6", // Blue
-	"#ec4899", // Fuchsia
-	"#10b981", // Emerald
-	"#f59e0b", // Amber
-	"#6366f1", // Indigo
 	"#14b8a6", // Teal
-	"#a855f7", // Violet
+	"#334155", // Deep Slate
 ];
 let colorIndex = 0;
 

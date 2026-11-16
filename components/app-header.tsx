@@ -9,9 +9,11 @@ interface AppHeaderProps {
   showPatientInfo?: boolean;
   patientUID?: string;
   mrNo?: string | number;
+  patientName?: string;
+  ageSex?: string;
 }
 
-export function AppHeader({ showPatientInfo, patientUID, mrNo }: AppHeaderProps) {
+export function AppHeader({ showPatientInfo, patientUID, mrNo, patientName, ageSex }: AppHeaderProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
@@ -38,14 +40,17 @@ export function AppHeader({ showPatientInfo, patientUID, mrNo }: AppHeaderProps)
 
           {/* Patient chips — only on detail page */}
           {showPatientInfo && patientUID && (
-            <div className="hidden md:flex items-center gap-2">
-              <span className="text-[13px] text-muted-foreground font-mono bg-muted/50 border border-border/70 rounded-md px-3 py-1.5 tracking-tight shadow-2xs">
-                UID: {patientUID}
-              </span>
+            <div className="hidden md:flex items-center gap-2 text-[13px] bg-[#1176bc]/5 border border-[#1176bc]/20 rounded-md px-3 py-1.5 shadow-2xs">
+              <span className="font-semibold text-foreground">{patientName || "—"}</span>
+              <span className="h-3.5 w-px bg-border" />
+              <span className="text-black dark:text-white">{ageSex || "—"}</span>
+              <span className="h-3.5 w-px bg-border" />
+              <span className="text-black dark:text-white font-mono tracking-tight">UID: {patientUID}</span>
               {mrNo && (
-                <span className="text-[13px] text-muted-foreground font-mono bg-muted/50 border border-border/70 rounded-md px-3 py-1.5 tracking-tight shadow-2xs">
-                  MR: {mrNo}
-                </span>
+                <>
+                  <span className="h-3.5 w-px bg-border" />
+                  <span className="text-black dark:text-white font-mono tracking-tight">MR: {mrNo}</span>
+                </>
               )}
             </div>
           )}

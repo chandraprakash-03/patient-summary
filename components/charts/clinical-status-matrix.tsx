@@ -13,7 +13,7 @@ import {
 	Flashlight,
 	Scissors,
 	Layers,
-	Filter,
+	SlidersHorizontal,
 	ArrowUpDown,
 	LayoutGrid,
 	Milestone,
@@ -184,11 +184,19 @@ function MetricEyeTrack({
 }) {
 	const hasValue = value != null && value !== "" && value !== "—";
 	const isRE = eye === "RE";
+	const isAbnormal = status.severity === "moderate" || status.severity === "critical";
+	const deltaColor = !delta
+		? "text-[#8aa0bb]"
+		: delta.trend === "up"
+		? "text-[#00a978]"
+		: delta.trend === "down"
+		? "text-[#f06d22]"
+		: "text-[#8aa0bb]";
 
 	if (!hasValue) {
 		return (
-			<div className="flex items-center justify-between px-2 py-1 rounded text-xs opacity-40">
-				<span className={`text-xs font-bold tracking-tight ${isRE ? "text-sky-700 dark:text-sky-400" : "text-purple-700 dark:text-purple-400"}`}>
+			<div className="flex items-center justify-between px-2 py-1 text-xs opacity-45">
+				<span className={`text-xs font-bold tracking-tight ${isRE ? "text-[#0089df]" : "text-[#6828ee]"}`}>
 					{eye}
 				</span>
 				<span className="font-mono text-xs text-muted-foreground/60">—</span>
@@ -199,30 +207,26 @@ function MetricEyeTrack({
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				<div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-md hover:bg-muted/50 transition-colors cursor-pointer">
+				<div className="flex items-center justify-between gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-[#f7fbff] cursor-pointer">
 					{/* Eye Laterality Tag & Formatted Value */}
 					<div className="flex items-center gap-1.5 min-w-0">
-						<span className={`text-xs font-bold tracking-tight shrink-0 ${isRE ? "text-sky-700 dark:text-sky-400" : "text-purple-700 dark:text-purple-400"}`}>
+						<span className={`text-xs font-bold tracking-tight shrink-0 ${isRE ? "text-[#0089df]" : "text-[#6828ee]"}`}>
 							{eye}
 						</span>
-						<span className="font-semibold text-xs font-mono text-foreground truncate">
+						<span
+							className={`font-bold text-xs truncate ${isAbnormal ? "text-[#f06d22]" : "text-[#0a315c] dark:text-slate-100"}`}
+						>
 							{value}
-							{unit && <span className="text-xs font-normal text-muted-foreground ml-1">{unit}</span>}
+								{unit && <span className="text-xs font-semibold text-[#537397] ml-1">{unit}</span>}
 						</span>
 					</div>
 
 					{/* Delta Indicator & Subtle Severity Dot (Only for Borderline / Critical) */}
 					<div className="flex items-center gap-1 shrink-0">
 						{delta && (
-							<span className="text-xs font-mono text-muted-foreground/75 tracking-tight" title={delta.diffText}>
+							<span className={`text-xs font-semibold tracking-tight ${deltaColor}`} title={delta.diffText}>
 								{delta.label}
 							</span>
-						)}
-						{status.severity === "moderate" && (
-							<span className="w-2 h-2 rounded-full bg-amber-500/80 shrink-0" title="Borderline finding" />
-						)}
-						{status.severity === "critical" && (
-							<span className="w-2 h-2 rounded-full bg-indigo-500/80 shrink-0" title="Significant / Alert finding" />
 						)}
 					</div>
 				</div>
@@ -532,6 +536,14 @@ export function ClinicalStatusMatrix({
 		};
 	}, [allDatePoints]);
 
+	const pastYearCount = useMemo(() => {
+		if (allDatePoints.length === 0) return 0;
+		const latestDate = parseISO(allDatePoints[allDatePoints.length - 1].date);
+		const oneYearAgo = subYears(latestDate, 1);
+		const count = allDatePoints.filter((d) => isAfter(parseISO(d.date), oneYearAgo)).length;
+		return count > 0 ? count : Math.min(5, allDatePoints.length);
+	}, [allDatePoints]);
+
 	if (allDatesChronological.length === 0) {
 		return (
 			<div className="py-12 text-center text-muted-foreground text-sm">
@@ -555,88 +567,87 @@ export function ClinicalStatusMatrix({
 
 	const proceduresCount = allDatePoints.filter((d) => d.procedures.length > 0).length;
 	const alertsCount = allDatePoints.filter((d) => d.hasAlert).length;
-	const pastYearCount = useMemo(() => {
-		if (allDatePoints.length === 0) return 0;
-		const latestDate = parseISO(allDatePoints[allDatePoints.length - 1].date);
-		const oneYearAgo = subYears(latestDate, 1);
-		const count = allDatePoints.filter((d) => isAfter(parseISO(d.date), oneYearAgo)).length;
-		return count > 0 ? count : Math.min(5, allDatePoints.length);
-	}, [allDatePoints]);
 
 	return (
 		<TooltipProvider delayDuration={120}>
-			<div className="w-full h-full flex flex-col space-y-1.5">
+			<div className="w-full h-full flex flex-col overflow-hidden rounded-[18px] border border-[#d9e4ee] bg-white shadow-[0_8px_24px_rgba(58,83,109,0.04)] dark:border-slate-700 dark:bg-slate-900">
 				{/* Top Status Grid Control Bar */}
-				<div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-card px-4 py-2.5 rounded-xl border border-border shadow-xs shrink-0">
+				<div className="flex min-h-[56px] items-center justify-between gap-5 border-b border-[#dce6f0] bg-white px-5 py-3 dark:border-slate-700 dark:bg-slate-900 shrink-0">
 					{/* Left: Window Presets Segmented Bar */}
-					<div className="flex items-center gap-2 flex-wrap">
-						<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mr-1">
-							<Filter className="w-3.5 h-3.5 text-muted-foreground" />
-							<span>Window:</span>
+					<div className="flex min-w-0 items-center gap-3 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+						<span className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#8195b1]">
+							<SlidersHorizontal className="w-3.5 h-3.5 text-[#8298b5]" />
+							<span>Window</span>
 						</span>
 
-						<div className="inline-flex rounded-lg p-1 bg-muted/40 dark:bg-muted/20 border border-border/80 shadow-2xs flex-wrap gap-1">
+						<div className="inline-flex shrink-0 items-center gap-1">
 							<button
+								data-no-hover
 								onClick={() => setFilterPreset("recent5")}
-								className={`px-3.5 py-1.5 h-8 rounded-md text-xs font-semibold transition-all flex items-center justify-center ${
+								className={`h-[30px] rounded-lg border px-3 text-[11px] font-semibold transition-colors flex items-center justify-center ${
 									filterPreset === "recent5"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-background/60"
+										? "border-[#71caff] bg-[#dff3ff] text-[#0078bd]"
+										: "border-[#d8e4ef] bg-white text-[#51708f] hover:border-[#a8cdec] hover:bg-[#f4f9fd]"
 								}`}
 							>
 								Recent (5)
 							</button>
 
 							<button
+								data-no-hover
 								onClick={() => setFilterPreset("recent10")}
-								className={`px-3.5 py-1.5 h-8 rounded-md text-xs font-semibold transition-all flex items-center justify-center ${
+								className={`h-[30px] rounded-lg border px-3 text-[11px] font-semibold transition-colors flex items-center justify-center ${
 									filterPreset === "recent10"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-background/60"
+										? "border-[#71caff] bg-[#dff3ff] text-[#0078bd]"
+										: "border-[#d8e4ef] bg-white text-[#51708f] hover:border-[#a8cdec] hover:bg-[#f4f9fd]"
 								}`}
 							>
 								Recent (10)
 							</button>
 
 							<button
+								data-no-hover
 								onClick={() => setFilterPreset("1year")}
-								className={`px-3.5 py-1.5 h-8 rounded-md text-xs font-semibold transition-all flex items-center justify-center ${
+								className={`h-[30px] rounded-lg border px-3 text-[11px] font-semibold transition-colors flex items-center justify-center ${
 									filterPreset === "1year"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-background/60"
+										? "border-[#71caff] bg-[#dff3ff] text-[#0078bd]"
+										: "border-[#d8e4ef] bg-white text-[#51708f] hover:border-[#a8cdec] hover:bg-[#f4f9fd]"
 								}`}
 							>
 								Past 1 Year ({pastYearCount})
 							</button>
 
 							<button
+								data-no-hover
 								onClick={() => setFilterPreset("procedures")}
-								className={`px-3.5 py-1.5 h-8 rounded-md text-xs font-semibold transition-all flex items-center justify-center ${
+								className={`h-[30px] rounded-lg border px-3 text-[11px] font-semibold transition-colors flex items-center justify-center ${
 									filterPreset === "procedures"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-background/60"
+										? "border-[#71caff] bg-[#dff3ff] text-[#0078bd]"
+										: "border-[#d8e4ef] bg-white text-[#51708f] hover:border-[#a8cdec] hover:bg-[#f4f9fd]"
 								}`}
 							>
 								Procedures ({proceduresCount})
 							</button>
 
 							<button
+								data-no-hover
 								onClick={() => setFilterPreset("alerts")}
-								className={`px-3.5 py-1.5 h-8 rounded-md text-xs font-semibold transition-all flex items-center justify-center ${
+								className={`h-[30px] rounded-lg border px-3 text-[11px] font-semibold transition-colors flex items-center justify-center ${
 									filterPreset === "alerts"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-background/60"
+										? "border-[#71caff] bg-[#dff3ff] text-[#0078bd]"
+										: "border-[#d8e4ef] bg-white text-[#51708f] hover:border-[#a8cdec] hover:bg-[#f4f9fd]"
 								}`}
 							>
 								Alerts ({alertsCount})
 							</button>
 
 							<button
+								data-no-hover
 								onClick={() => setFilterPreset("all")}
-								className={`px-3.5 py-1.5 h-8 rounded-md text-xs font-semibold transition-all flex items-center justify-center ${
+								className={`h-[30px] rounded-lg border px-3 text-[11px] font-semibold transition-colors flex items-center justify-center ${
 									filterPreset === "all"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-background/60"
+										? "border-[#71caff] bg-[#dff3ff] text-[#0078bd]"
+										: "border-[#d8e4ef] bg-white text-[#51708f] hover:border-[#a8cdec] hover:bg-[#f4f9fd]"
 								}`}
 							>
 								All ({allDatePoints.length})
@@ -645,44 +656,47 @@ export function ClinicalStatusMatrix({
 					</div>
 
 					{/* Right: Legend & Sort & View Layout */}
-					<div className="flex items-center gap-2.5 flex-wrap justify-between sm:justify-end w-full sm:w-auto">
+					<div className="flex shrink-0 items-center gap-2.5">
 						{/* Sort Direction Toggle */}
 						<button
+							data-no-hover
 							onClick={() =>
 								setSortOrder(sortOrder === "oldestFirst" ? "newestFirst" : "oldestFirst")
 							}
-							className="flex items-center gap-1.5 px-3 py-1.5 h-8 rounded-lg text-xs font-semibold bg-background text-foreground hover:bg-muted border border-border/80 shadow-2xs transition-all"
+							className="flex h-[30px] items-center gap-1.5 rounded-lg border border-[#d8e4ef] bg-white px-3 text-[11px] font-semibold text-[#51708f] transition-colors hover:border-[#a8cdec] hover:bg-[#f4f9fd]"
 							title="Toggle chronological direction"
 						>
-							<ArrowUpDown className="w-3.5 h-3.5 text-primary" />
+							<ArrowUpDown className="w-3.5 h-3.5 text-[#6683a2]" />
 							<span>{sortOrder === "oldestFirst" ? "Oldest → Newest" : "Newest → Oldest"}</span>
 						</button>
 
 						{/* View Layout Toggle (Grid vs Milestones) */}
-						<div className="inline-flex rounded-lg p-1 bg-muted/40 dark:bg-muted/20 border border-border/80 shadow-2xs gap-1">
+						<div className="inline-flex rounded-lg border border-[#d8e4ef] bg-[#f7f9fc] p-0.5 gap-1 dark:border-slate-700 dark:bg-slate-800">
 							<button
+								data-no-hover
 								onClick={() => setLayout("matrix")}
-								className={`flex items-center gap-1.5 px-3 py-1.5 h-8 rounded-md text-xs font-semibold transition-all ${
+								className={`flex h-[30px] items-center gap-1.5 rounded-md px-3 text-[11px] font-semibold transition-colors ${
 									layout === "matrix"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-background/60"
+										? "border border-[#e1e9f2] bg-white text-[#0078bd] shadow-[0_1px_2px_rgba(28,54,81,0.08)]"
+										: "border border-transparent text-[#6c84a2] hover:bg-white/80"
 								}`}
 								title="Status Grid View"
 							>
-								<LayoutGrid className={`w-3.5 h-3.5 ${layout === "matrix" ? "text-primary-foreground" : "text-muted-foreground"}`} />
+								<LayoutGrid className={`w-3.5 h-3.5 ${layout === "matrix" ? "text-[#0078bd]" : "text-[#6c84a2]"}`} />
 								<span className="hidden sm:inline">Grid</span>
 							</button>
 
 							<button
+								data-no-hover
 								onClick={() => setLayout("milestones")}
-								className={`flex items-center gap-1.5 px-3 py-1.5 h-8 rounded-md text-xs font-semibold transition-all ${
+								className={`flex h-[30px] items-center gap-1.5 rounded-md px-3 text-[11px] font-semibold transition-colors ${
 									layout === "milestones"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-background/60"
+										? "border border-[#e1e9f2] bg-white text-[#0078bd] shadow-[0_1px_2px_rgba(28,54,81,0.08)]"
+										: "border border-transparent text-[#6c84a2] hover:bg-white/80"
 								}`}
 								title="Milestones Summary View"
 							>
-								<Milestone className={`w-3.5 h-3.5 ${layout === "milestones" ? "text-primary-foreground" : "text-muted-foreground"}`} />
+								<Milestone className={`w-3.5 h-3.5 ${layout === "milestones" ? "text-[#0078bd]" : "text-[#6c84a2]"}`} />
 								<span className="hidden sm:inline">Milestones</span>
 							</button>
 						</div>
@@ -800,59 +814,39 @@ export function ClinicalStatusMatrix({
 
 				{/* BILATERAL STATUS MATRIX TABLE */}
 				{layout === "matrix" && (
-					<div className="w-full flex-1 min-h-0 overflow-auto rounded-lg border border-border/70 bg-card shadow-2xs box-scroll">
+					<div className="w-full flex-1 min-h-0 overflow-auto bg-white box-scroll">
 						<table className="w-full border-collapse text-left min-w-[700px]">
 							<thead>
-								<tr className="border-b border-border/70 bg-muted/30 sticky top-0 z-30">
+								<tr className="sticky top-0 z-30 border-b border-[#dbe5ef] bg-[#f7f9fc]">
 									{/* Sticky Parameter Column Header */}
-									<th className="sticky left-0 z-30 w-[240px] min-w-[240px] py-3.5 px-4 text-xs font-semibold text-muted-foreground bg-slate-100 dark:bg-slate-800 backdrop-blur-md border-b border-r border-border shadow-[3px_0_10px_-3px_rgba(0,0,0,0.08)]">
-										<div className="flex items-center gap-3">
-											<div className="w-8 h-8 rounded-full bg-white dark:bg-slate-900 text-primary flex items-center justify-center shrink-0 border border-border/80 shadow-2xs">
-												<Layers className="w-4 h-4 stroke-[2.2]" />
+									<th className="sticky left-0 z-30 w-[220px] min-w-[220px] px-4 py-3 text-xs font-semibold bg-[#f7f9fc] dark:bg-slate-800 border-b border-r border-[#dbe5ef]">
+										<div className="flex items-center gap-2.5">
+											<div className="w-8 h-8 rounded-lg bg-[#eaf7ff] text-[#0089df] flex items-center justify-center shrink-0">
+												<Layers className="w-4 h-4 stroke-[2]" />
 											</div>
 											<div className="flex flex-col min-w-0">
-												<span className="text-[13px] font-bold text-foreground tracking-tight">Parameters</span>
-												<span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Bilateral Eye Metrics</span>
+												<span className="text-[13px] font-bold text-[#0b2d55] tracking-tight">Parameters</span>
+												<span className="text-[11px] font-medium text-[#6380a4]">Bilateral eye metrics</span>
 											</div>
 										</div>
 									</th>
 
 									{/* Visit Column Headers */}
 									{filteredDatePoints.map((col) => {
-										const isLatest = col.isLatest;
-										const isBaseline = col.isBaseline;
 										const originalIndex = allDatesChronological.indexOf(col.date);
 
 										return (
 											<th
 												key={col.date}
-												className={`py-3 px-3 text-center min-w-[155px] border-r border-border/40 last:border-r-0 transition-colors ${
-													isLatest
-														? "bg-muted/40 font-semibold"
-														: ""
-												}`}
+												className="min-w-[145px] border-r border-[#dbe5ef] px-3 py-3 text-center last:border-r-0"
 											>
 												<div className="flex flex-col items-center justify-center gap-0.5">
-													<span className="text-xs font-semibold text-foreground">
+													<span className="text-xs font-bold text-[#0b2d55]">
 														{format(parseISO(col.date), "dd MMM yyyy")}
 													</span>
 													<div className="flex items-center gap-1.5 text-xs">
-														{isLatest ? (
-															<span className="font-semibold text-primary">
-																Latest
-															</span>
-														) : isBaseline && allDatesChronological.length > 1 ? (
-															<span className="text-muted-foreground font-medium">
-																Initial
-															</span>
-														) : (
-															<span className="text-muted-foreground/60">
-																#{originalIndex + 1}
-															</span>
-														)}
-														{col.hasAlert && (
-															<span className="w-1.5 h-1.5 rounded-full bg-amber-500/80 inline-block ml-0.5" title="Borderline or notable findings on this date" />
-														)}
+														<span className="font-medium text-[#8298b6]">#{originalIndex + 1}</span>
+														<span className={`inline-block h-1.5 w-1.5 rounded-full ${col.hasAlert ? "bg-[#f5a623]" : "bg-[#c7d5e5]"}`} title={col.hasAlert ? "Borderline or notable findings on this date" : "Recorded visit"} />
 													</div>
 												</div>
 											</th>
@@ -864,17 +858,17 @@ export function ClinicalStatusMatrix({
 							<tbody>
 								{/* 1. PROCEDURES ROW */}
 								{showProcedures && (
-									<tr className="border-b border-border/50 hover:bg-muted/10 transition-colors">
-										<td className="sticky left-0 z-20 py-3.5 px-4 bg-slate-100 dark:bg-slate-800 backdrop-blur-md border-b border-r border-border shadow-[3px_0_10px_-3px_rgba(0,0,0,0.08)]">
+									<tr className="border-b border-[#dbe5ef] hover:bg-[#fbfdff] transition-colors">
+										<td className="sticky left-0 z-20 bg-white px-4 py-3.5 dark:bg-slate-900 border-b border-r border-[#dbe5ef]">
 											<div className="flex items-center gap-3">
-												<div className="w-8 h-8 rounded-full bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-border/80 shadow-2xs">
+												<div className="w-8 h-8 rounded-lg bg-[#eaf7ff] text-[#0089df] flex items-center justify-center shrink-0">
 													<Syringe className="w-4 h-4 stroke-[2.2]" />
 												</div>
 												<div className="flex flex-col min-w-0">
-													<span className="text-[13px] font-bold text-foreground leading-tight">
+													<span className="text-[13px] font-bold text-[#0b2d55] leading-tight">
 														Procedures
 													</span>
-													<span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+													<span className="text-[11px] font-medium text-[#6380a4] mt-0.5">
 														Injections & Surgery
 													</span>
 												</div>
@@ -885,7 +879,7 @@ export function ClinicalStatusMatrix({
 											return (
 												<td
 													key={`proc-${col.date}`}
-													className="py-2.5 px-2.5 text-center align-middle border-r border-border/40 last:border-r-0"
+													className="border-r border-[#dbe5ef] px-2.5 py-2.5 text-center align-middle last:border-r-0"
 												>
 													{procs.length > 0 ? (
 														<div className="flex flex-col gap-1.5 items-center justify-center max-w-[155px] mx-auto">
@@ -897,12 +891,12 @@ export function ClinicalStatusMatrix({
 																return (
 																	<Tooltip key={pIdx}>
 																		<TooltipTrigger asChild>
-																			<div className="w-full inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-muted/30 hover:bg-muted/60 text-foreground border border-border/60 shadow-2xs transition-colors cursor-pointer">
-																				<span className={`text-xs font-bold ${isRE ? "text-sky-700 dark:text-sky-400" : isLE ? "text-purple-700 dark:text-purple-400" : "text-muted-foreground"}`}>
+																	<div className="w-full inline-flex items-center gap-1.5 rounded-md bg-[#f6f8fb] px-2.5 py-1.5 text-xs font-medium text-[#0b2d55] transition-colors hover:bg-[#eef3f8] cursor-pointer dark:bg-slate-800">
+																		<span className={`text-xs font-bold ${isRE ? "text-[#0089df]" : isLE ? "text-[#6828ee]" : "text-[#738aa6]"}`}>
 																					{proc.eyeTag}:
 																				</span>
-																				<IconComponent className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-																				<span className="truncate text-xs text-foreground font-medium">
+																		<IconComponent className="w-3.5 h-3.5 text-[#6f89a7] shrink-0" />
+																		<span className="truncate text-xs text-[#0b2d55] font-semibold">
 																					{proc.name}
 																				</span>
 																			</div>
@@ -934,17 +928,17 @@ export function ClinicalStatusMatrix({
 
 								{/* 2. VISUAL ACUITY (BCVA) ROW */}
 								{showVA && (
-									<tr className="border-b border-border/50 hover:bg-muted/10 transition-colors">
-										<td className="sticky left-0 z-20 py-3.5 px-4 bg-slate-100 dark:bg-slate-800 backdrop-blur-md border-b border-r border-border shadow-[3px_0_10px_-3px_rgba(0,0,0,0.08)]">
+									<tr className="border-b border-[#dbe5ef] hover:bg-[#fbfdff] transition-colors">
+										<td className="sticky left-0 z-20 bg-white px-4 py-3.5 dark:bg-slate-900 border-b border-r border-[#dbe5ef]">
 											<div className="flex items-center gap-3">
-												<div className="w-8 h-8 rounded-full bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-border/80 shadow-2xs">
+												<div className="w-8 h-8 rounded-lg bg-[#eaf7ff] text-[#0089df] flex items-center justify-center shrink-0">
 													<Eye className="w-4 h-4 stroke-[2.2]" />
 												</div>
 												<div className="flex flex-col min-w-0">
-													<span className="text-[13px] font-bold text-foreground leading-tight">
+													<span className="text-[13px] font-bold text-[#0b2d55] leading-tight">
 														Visual Acuity (BCVA)
 													</span>
-													<span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+													<span className="text-[11px] font-medium text-[#6380a4] mt-0.5">
 														Distance & Near Vision
 													</span>
 												</div>
@@ -955,10 +949,10 @@ export function ClinicalStatusMatrix({
 											return (
 												<td
 													key={`va-${col.date}`}
-													className="py-2.5 px-2.5 text-center align-middle border-r border-border/40 last:border-r-0"
+													className="border-r border-[#dbe5ef] px-2.5 py-2.5 text-center align-middle last:border-r-0"
 												>
 													{hasAnyVA ? (
-														<div className="flex flex-col gap-1 w-full max-w-[155px] mx-auto p-1.5 rounded-lg border border-border/50 bg-card shadow-2xs">
+														<div className="mx-auto flex w-full max-w-[155px] flex-col gap-1 rounded-lg border border-[#b7d0e7] bg-white p-1.5 shadow-[0_1px_2px_rgba(36,83,121,0.05)]">
 															{/* RE Track */}
 															<MetricEyeTrack
 																eye="RE"
@@ -970,7 +964,7 @@ export function ClinicalStatusMatrix({
 															/>
 
 															{/* Hairline Separator */}
-															<div className="h-px bg-border/40 w-full" />
+															<div className="h-px w-full bg-[#deebf5]" />
 
 															{/* LE Track */}
 															<MetricEyeTrack
@@ -993,17 +987,17 @@ export function ClinicalStatusMatrix({
 
 								{/* 3. INTRAOCULAR PRESSURE (IOP) ROW */}
 								{showIOP && (
-									<tr className="border-b border-border/50 hover:bg-muted/10 transition-colors">
-										<td className="sticky left-0 z-20 py-3.5 px-4 bg-slate-100 dark:bg-slate-800 backdrop-blur-md border-b border-r border-border shadow-[3px_0_10px_-3px_rgba(0,0,0,0.08)]">
+									<tr className="border-b border-[#dbe5ef] hover:bg-[#fbfdff] transition-colors">
+										<td className="sticky left-0 z-20 bg-white px-4 py-3.5 dark:bg-slate-900 border-b border-r border-[#dbe5ef]">
 											<div className="flex items-center gap-3">
-												<div className="w-8 h-8 rounded-full bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-border/80 shadow-2xs">
+												<div className="w-8 h-8 rounded-lg bg-[#eaf7ff] text-[#0089df] flex items-center justify-center shrink-0">
 													<Droplets className="w-4 h-4 stroke-[2.2]" />
 												</div>
 												<div className="flex flex-col min-w-0">
-													<span className="text-[13px] font-bold text-foreground leading-tight">
+													<span className="text-[13px] font-bold text-[#0b2d55] leading-tight">
 														Intraocular Pressure (IOP)
 													</span>
-													<span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+													<span className="text-[11px] font-medium text-[#6380a4] mt-0.5">
 														Tonometry (mmHg)
 													</span>
 												</div>
@@ -1014,10 +1008,10 @@ export function ClinicalStatusMatrix({
 											return (
 												<td
 													key={`iop-${col.date}`}
-													className="py-2.5 px-2.5 text-center align-middle border-r border-border/40 last:border-r-0"
+													className="border-r border-[#dbe5ef] px-2.5 py-2.5 text-center align-middle last:border-r-0"
 												>
 													{hasAnyIOP ? (
-														<div className="flex flex-col gap-1 w-full max-w-[155px] mx-auto p-1.5 rounded-lg border border-border/50 bg-card shadow-2xs">
+														<div className="mx-auto flex w-full max-w-[155px] flex-col gap-1 rounded-lg border border-[#b7d0e7] bg-white p-1.5 shadow-[0_1px_2px_rgba(36,83,121,0.05)]">
 															{/* RE Track */}
 															<MetricEyeTrack
 																eye="RE"
@@ -1030,7 +1024,7 @@ export function ClinicalStatusMatrix({
 															/>
 
 															{/* Hairline Separator */}
-															<div className="h-px bg-border/40 w-full" />
+															<div className="h-px w-full bg-[#deebf5]" />
 
 															{/* LE Track */}
 															<MetricEyeTrack
@@ -1054,17 +1048,17 @@ export function ClinicalStatusMatrix({
 
 								{/* 4. CENTRAL MACULAR THICKNESS (CMT) ROW */}
 								{showCMT && (
-									<tr className="border-b border-border/50 hover:bg-muted/10 transition-colors">
-										<td className="sticky left-0 z-20 py-3.5 px-4 bg-slate-100 dark:bg-slate-800 backdrop-blur-md border-b border-r border-border shadow-[3px_0_10px_-3px_rgba(0,0,0,0.08)]">
+									<tr className="border-b border-[#dbe5ef] hover:bg-[#fbfdff] transition-colors">
+										<td className="sticky left-0 z-20 bg-white px-4 py-3.5 dark:bg-slate-900 border-b border-r border-[#dbe5ef]">
 											<div className="flex items-center gap-3">
-												<div className="w-8 h-8 rounded-full bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-border/80 shadow-2xs">
+												<div className="w-8 h-8 rounded-lg bg-[#eaf7ff] text-[#0089df] flex items-center justify-center shrink-0">
 													<ScanLine className="w-4 h-4 stroke-[2.2]" />
 												</div>
 												<div className="flex flex-col min-w-0">
-													<span className="text-[13px] font-bold text-foreground leading-tight">
+													<span className="text-[13px] font-bold text-[#0b2d55] leading-tight">
 														Central Macula (CMT)
 													</span>
-													<span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+													<span className="text-[11px] font-medium text-[#6380a4] mt-0.5">
 														OCT Thickness (µm)
 													</span>
 												</div>
@@ -1075,10 +1069,10 @@ export function ClinicalStatusMatrix({
 											return (
 												<td
 													key={`cmt-${col.date}`}
-													className="py-2.5 px-2.5 text-center align-middle border-r border-border/40 last:border-r-0"
+													className="border-r border-[#dbe5ef] px-2.5 py-2.5 text-center align-middle last:border-r-0"
 												>
 													{hasAnyCMT ? (
-														<div className="flex flex-col gap-1 w-full max-w-[155px] mx-auto p-1.5 rounded-lg border border-border/50 bg-card shadow-2xs">
+														<div className="mx-auto flex w-full max-w-[155px] flex-col gap-1 rounded-lg border border-[#b7d0e7] bg-white p-1.5 shadow-[0_1px_2px_rgba(36,83,121,0.05)]">
 															{/* RE Track */}
 															<MetricEyeTrack
 																eye="RE"
@@ -1091,7 +1085,7 @@ export function ClinicalStatusMatrix({
 															/>
 
 															{/* Hairline Separator */}
-															<div className="h-px bg-border/40 w-full" />
+															<div className="h-px w-full bg-[#deebf5]" />
 
 															{/* LE Track */}
 															<MetricEyeTrack

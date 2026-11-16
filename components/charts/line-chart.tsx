@@ -201,7 +201,15 @@ export function LineChart({
 	};
 
 	// Unified clinical tooltip
-	const UnifiedTrendTooltip = ({ active, label }: any) => {
+	const UnifiedTrendTooltip = ({
+		active,
+		label,
+		metric,
+	}: {
+		active?: boolean;
+		label?: string;
+		metric: "VA" | "IOP" | "CMT";
+	}) => {
 		if (!active || !label) return null;
 		const item = unifiedData.find((d) => d.date === label);
 		if (!item) return null;
@@ -249,8 +257,8 @@ export function LineChart({
 
 				{/* Metrics Grid */}
 				<div className="space-y-1.5">
-					{/* VA */}
-					{showVA && (
+					{/* Show only the metric belonging to the chart being hovered. */}
+					{metric === "VA" && (
 						<div className="p-1.5 rounded-md bg-muted/30 border border-border/40 space-y-0.5">
 							<div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
 								<span className="flex items-center gap-1">
@@ -278,7 +286,7 @@ export function LineChart({
 					)}
 
 					{/* IOP */}
-					{showIOP && (
+					{metric === "IOP" && (
 						<div className="p-1.5 rounded-md bg-muted/30 border border-border/40 space-y-0.5">
 							<div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
 								<span className="flex items-center gap-1">
@@ -323,7 +331,7 @@ export function LineChart({
 					)}
 
 					{/* CMT */}
-					{showCMT && (
+					{metric === "CMT" && (
 						<div className="p-1.5 rounded-md bg-muted/30 border border-border/40 space-y-0.5">
 							<div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
 								<span className="flex items-center gap-1">
@@ -440,7 +448,7 @@ export function LineChart({
 			{/* 1. VISUAL ACUITY (BCVA) CHART TRACK                                       */}
 			{/* ========================================================================= */}
 			{showVA && (
-				<div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
+				<div className="relative overflow-visible rounded-xl border border-border/80 bg-card shadow-xs">
 					{/* Track Header */}
 					<div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-50/80 dark:bg-slate-900/60 border-b border-border/70 text-xs">
 						<div className="flex items-center gap-2">
@@ -488,7 +496,11 @@ export function LineChart({
 									tick={{ fontSize: 10, fill: "currentColor" }}
 									tickFormatter={formatVATick}
 								/>
-								<Tooltip content={(props: any) => <UnifiedTrendTooltip {...props} />} />
+								<Tooltip
+									allowEscapeViewBox={{ x: true, y: true }}
+									wrapperStyle={{ zIndex: 100, pointerEvents: "none" }}
+									content={(props: any) => <UnifiedTrendTooltip {...props} metric="VA" />}
+								/>
 
 								{/* Subtle vertical milestone lines for procedures */}
 								{showProcedures &&
@@ -543,7 +555,7 @@ export function LineChart({
 			{/* 2. INTRAOCULAR PRESSURE (IOP) CHART TRACK                                 */}
 			{/* ========================================================================= */}
 			{showIOP && (
-				<div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
+				<div className="relative overflow-visible rounded-xl border border-border/80 bg-card shadow-xs">
 					{/* Track Header */}
 					<div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-50/80 dark:bg-slate-900/60 border-b border-border/70 text-xs">
 						<div className="flex items-center gap-2">
@@ -593,7 +605,11 @@ export function LineChart({
 									tick={{ fontSize: 10, fill: "currentColor" }}
 									tickFormatter={(v) => `${v}`}
 								/>
-								<Tooltip content={(props: any) => <UnifiedTrendTooltip {...props} />} />
+								<Tooltip
+									allowEscapeViewBox={{ x: true, y: true }}
+									wrapperStyle={{ zIndex: 100, pointerEvents: "none" }}
+									content={(props: any) => <UnifiedTrendTooltip {...props} metric="IOP" />}
+								/>
 
 								{/* Subtle vertical milestone lines for procedures */}
 								{showProcedures &&
@@ -648,7 +664,7 @@ export function LineChart({
 			{/* 3. CENTRAL MACULAR THICKNESS (CMT) CHART TRACK                           */}
 			{/* ========================================================================= */}
 			{showCMT && (
-				<div className="rounded-xl border border-border/80 bg-card overflow-hidden shadow-xs">
+				<div className="relative overflow-visible rounded-xl border border-border/80 bg-card shadow-xs">
 					{/* Track Header */}
 					<div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-50/80 dark:bg-slate-900/60 border-b border-border/70 text-xs">
 						<div className="flex items-center gap-2">
@@ -698,7 +714,11 @@ export function LineChart({
 									tick={{ fontSize: 10, fill: "currentColor" }}
 									tickFormatter={(v) => `${v}`}
 								/>
-								<Tooltip content={(props: any) => <UnifiedTrendTooltip {...props} />} />
+								<Tooltip
+									allowEscapeViewBox={{ x: true, y: true }}
+									wrapperStyle={{ zIndex: 100, pointerEvents: "none" }}
+									content={(props: any) => <UnifiedTrendTooltip {...props} metric="CMT" />}
+								/>
 
 								{/* Subtle vertical milestone lines for procedures */}
 								{showProcedures &&

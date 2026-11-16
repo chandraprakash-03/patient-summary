@@ -882,7 +882,7 @@ export function ObservationsView({
 									<button
 										onClick={() => setProgressionEye("BE")}
 										className={`h-7.5 px-2.5 sm:px-3 text-xs font-semibold rounded-md transition-all flex items-center gap-1 ${progressionEye === "BE"
-											? "bg-primary text-primary-foreground shadow-xs font-bold"
+											? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
 											: "text-muted-foreground hover:text-foreground hover:bg-background/50"
 											}`}
 										title="Both Eyes (BE)"
@@ -893,7 +893,7 @@ export function ObservationsView({
 									<button
 										onClick={() => setProgressionEye("RE")}
 										className={`h-7.5 px-2.5 sm:px-3 text-xs font-semibold rounded-md transition-all flex items-center gap-1 ${progressionEye === "RE"
-											? "bg-primary text-primary-foreground shadow-xs font-bold"
+											? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
 											: "text-muted-foreground hover:text-foreground hover:bg-background/50"
 											}`}
 										title="Right Eye (RE)"
@@ -904,7 +904,7 @@ export function ObservationsView({
 									<button
 										onClick={() => setProgressionEye("LE")}
 										className={`h-7.5 px-2.5 sm:px-3 text-xs font-semibold rounded-md transition-all flex items-center gap-1 ${progressionEye === "LE"
-											? "bg-primary text-primary-foreground shadow-xs font-bold"
+											? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
 											: "text-muted-foreground hover:text-foreground hover:bg-background/50"
 											}`}
 										title="Left Eye (LE)"
@@ -919,7 +919,7 @@ export function ObservationsView({
 									<button
 										onClick={() => setTimelineScope("all")}
 										className={`h-7.5 px-2.5 sm:px-3 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${timelineScope === "all"
-											? "bg-primary text-primary-foreground shadow-xs font-bold"
+											? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
 											: "text-muted-foreground hover:text-foreground hover:bg-background/50"
 											}`}
 									>
@@ -928,7 +928,7 @@ export function ObservationsView({
 									<button
 										onClick={() => setTimelineScope("milestones")}
 										className={`h-7.5 px-2.5 sm:px-3 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${timelineScope === "milestones"
-											? "bg-primary text-primary-foreground shadow-xs font-bold"
+											? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
 											: "text-muted-foreground hover:text-foreground hover:bg-background/50"
 											}`}
 									>
@@ -1101,7 +1101,7 @@ export function ObservationsView({
 													setCompareVisitIndex(null);
 												}
 											}}
-											className={`flex-shrink-0 w-[calc((100%-32px)/5)] min-w-[120px] px-3.5 py-2.5 rounded-xl border text-[13px] font-medium transition-all flex flex-col items-center gap-1 ${isDisabledInCompare
+											className={`flex-shrink-0 w-[calc((100%-32px)/5)] min-w-[120px] px-3.5 py-2.5 rounded-xl border text-[13px] font-medium transition-all flex flex-col items-center gap-1 group ${isDisabledInCompare
 												? "opacity-25 cursor-not-allowed pointer-events-none bg-muted/20 border-dashed border-border/40 text-muted-foreground/40 select-none"
 												: isCompareTarget
 													? "bg-primary text-primary-foreground border-primary shadow-xs font-bold ring-2 ring-primary/40 scale-[1.02]"
@@ -1109,7 +1109,7 @@ export function ObservationsView({
 														? "bg-primary text-primary-foreground border-primary shadow-xs font-bold scale-[1.02]"
 														: isCompareMode && isAllowedInCompare
 															? "bg-primary/10 text-primary border-primary/40 hover:bg-primary/20 hover:border-primary cursor-pointer"
-															: "bg-card text-foreground border-border/80 hover:bg-muted/60"
+															: "bg-card text-foreground border-border/80 hover:bg-primary hover:text-primary-foreground hover:border-primary"
 												}`}
 											title={
 												isDisabledInCompare
@@ -1140,14 +1140,14 @@ export function ObservationsView({
 														{vIdx}
 													</span>
 												) : isLatest ? (
-													<span className="text-primary font-bold text-[13px]">Latest</span>
+													<span className="text-primary group-hover:text-white font-bold text-[13px]">Latest</span>
 												) : isBaseline ? (
-													<span className="font-semibold text-muted-foreground text-[13px]">Initial Visit</span>
+													<span className="font-semibold text-muted-foreground group-hover:text-white text-[13px]">Initial Visit</span>
 												) : (
-													<span className="text-muted-foreground/75 text-[13px]">#{vIdx + 1}</span>
+													<span className="text-muted-foreground/75 group-hover:text-white text-[13px]">#{vIdx + 1}</span>
 												)}
 												{isMilestone && !isSelected && !isCompareTarget && !isDisabledInCompare && (
-													<span className="w-2 h-2 rounded-full bg-primary/50 inline-block ml-0.5" title="Clinical events/procedures" />
+													<span className="w-2 h-2 rounded-full bg-primary/50 group-hover:bg-white/80 inline-block ml-0.5" title="Clinical events/procedures" />
 												)}
 											</div>
 										</button>
@@ -1212,9 +1212,17 @@ export function ObservationsView({
 									<span className="text-xs font-bold text-foreground whitespace-nowrap">
 										Visit Clinical Records
 									</span>
-									<span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-background border border-border text-foreground shadow-2xs whitespace-nowrap">
-										Visit {inspectorVisitIndex + 1} of {visits.length} ({inspectedVisit ? formatVisitDate(inspectedVisit.d) : ""})
-									</span>
+									<span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+											<span className="text-xs px-2.5 py-1 rounded-full font-bold bg-primary text-primary-foreground shadow-xs">
+												Viewing Visit #{inspectorVisitIndex + 1}
+											</span>
+											<span className="text-xs px-2.5 py-1 rounded-full font-bold bg-primary/10 text-primary border border-primary/40">
+												{inspectedVisit ? formatVisitDate(inspectedVisit.d) : ""}
+											</span>
+											<span className="text-xs font-medium text-muted-foreground">
+												{inspectorVisitIndex === visits.length - 1 ? "Latest visit" : `of ${visits.length} total`}
+											</span>
+										</span>
 								</div>
 							</div>
 
@@ -1222,15 +1230,15 @@ export function ObservationsView({
 							<div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto box-scroll pb-1 sm:pb-0">
 								<button
 									onClick={() => setVisitDetailsTab("diagnosis")}
-									className={`flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "diagnosis"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+									className={`group flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "diagnosis"
+										? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
+										: "text-black dark:text-white border border-black/70 dark:border-white/60 hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-xs"
 										}`}
 								>
 									<Activity className="w-3.5 h-3.5" />
 									<span className="whitespace-nowrap">Diagnosis</span>
 									{inspectedDiagnoses.totalCount > 0 && (
-										<span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${visitDetailsTab === "diagnosis" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground border border-border/60"
+										<span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${visitDetailsTab === "diagnosis" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground border border-border/60 group-hover:bg-white/25 group-hover:border-white/40"
 											}`}>
 											{inspectedDiagnoses.totalCount}
 										</span>
@@ -1239,15 +1247,15 @@ export function ObservationsView({
 
 								<button
 									onClick={() => setVisitDetailsTab("systemic")}
-									className={`flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "systemic"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+									className={`group flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "systemic"
+										? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
+										: "text-black dark:text-white border border-black/70 dark:border-white/60 hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-xs"
 										}`}
 								>
 									<ShieldCheck className="w-3.5 h-3.5" />
 									<span className="whitespace-nowrap">System History</span>
 									{inspectedSystemic.active.length > 0 && (
-										<span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${visitDetailsTab === "systemic" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground border border-border/60"
+										<span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${visitDetailsTab === "systemic" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground border border-border/60 group-hover:bg-white/25 group-hover:border-white/40"
 											}`}>
 											{inspectedSystemic.active.length}
 										</span>
@@ -1256,15 +1264,15 @@ export function ObservationsView({
 
 								<button
 									onClick={() => setVisitDetailsTab("medications")}
-									className={`flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "medications"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+									className={`group flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "medications"
+										? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
+										: "text-black dark:text-white border border-black/70 dark:border-white/60 hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-xs"
 										}`}
 								>
 									<Pill className="w-3.5 h-3.5" />
 									<span className="whitespace-nowrap">Medications</span>
 									{inspectedMedications.length > 0 && (
-										<span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${visitDetailsTab === "medications" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground border border-border/60"
+										<span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${visitDetailsTab === "medications" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground border border-border/60 group-hover:bg-white/25 group-hover:border-white/40"
 											}`}>
 											{inspectedMedications.length}
 										</span>
@@ -1273,15 +1281,15 @@ export function ObservationsView({
 
 								<button
 									onClick={() => setVisitDetailsTab("procedures")}
-									className={`flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "procedures"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+									className={`group flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "procedures"
+										? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
+										: "text-black dark:text-white border border-black/70 dark:border-white/60 hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-xs"
 										}`}
 								>
 									<Zap className="w-3.5 h-3.5" />
 									<span className="whitespace-nowrap">Procedures</span>
 									{inspectedProcedures.length > 0 && (
-										<span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${visitDetailsTab === "procedures" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground border border-border/60"
+										<span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${visitDetailsTab === "procedures" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground border border-border/60 group-hover:bg-white/25 group-hover:border-white/40"
 											}`}>
 											{inspectedProcedures.length}
 										</span>
@@ -1290,15 +1298,15 @@ export function ObservationsView({
 
 								<button
 									onClick={() => setVisitDetailsTab("other")}
-									className={`flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "other"
-										? "bg-primary text-primary-foreground shadow-xs font-bold"
-										: "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+									className={`group flex items-center gap-1.5 px-3.5 py-1.5 h-8.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap shrink-0 ${visitDetailsTab === "other"
+										? "bg-primary text-primary-foreground shadow-xs font-bold border border-primary"
+										: "text-black dark:text-white border border-black/70 dark:border-white/60 hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-xs"
 										}`}
 								>
 									<Layers className="w-3.5 h-3.5" />
 									<span className="whitespace-nowrap">Other Data</span>
 									{inspectedOtherData.hasData && (
-										<span className={`w-1.5 h-1.5 rounded-full shrink-0 ${visitDetailsTab === "other" ? "bg-primary-foreground" : "bg-primary"
+										<span className={`w-1.5 h-1.5 rounded-full shrink-0 ${visitDetailsTab === "other" ? "bg-primary-foreground" : "bg-primary group-hover:bg-white"
 											}`} />
 									)}
 								</button>
@@ -1476,14 +1484,14 @@ export function ObservationsView({
 												return (
 													<div
 														key={i}
-														className="p-2.5 rounded-xl bg-card border border-border/80 shadow-2xs flex items-start justify-between gap-2"
+														className="p-2.5 rounded-xl bg-card border border-border/80 shadow-2xs flex items-center justify-between gap-2.5"
 													>
-														<div className="flex items-start gap-2.5 min-w-0 flex-1">
-															<div className="w-6 h-6 rounded-full bg-muted text-foreground flex items-center justify-center font-bold text-xs shrink-0 border border-border/60 mt-0.5">
+														<div className="flex items-center gap-2.5 min-w-0 flex-1">
+															<div className="w-6 h-6 rounded-full bg-muted text-foreground flex items-center justify-center font-bold text-xs shrink-0 border border-border/60">
 																Rx
 															</div>
 															<div className="min-w-0 flex-1">
-																<div className="text-xs font-bold text-foreground break-words leading-tight" title={med.name}>
+																<div className="text-[13px] font-bold text-foreground break-words leading-tight" title={med.name}>
 																	{med.name}
 																</div>
 																{(med.frequency || med.dosage) && (
@@ -1715,7 +1723,7 @@ export function ObservationsView({
 												: `Visit ${inspectorVisitIndex + 1} Findings`}
 										</span>
 									</div>
-									<span className="text-xs text-muted-foreground font-semibold">
+									<span className={`text-xs font-bold whitespace-nowrap shrink-0 ${isComparing ? "text-muted-foreground" : "px-2.5 py-1 rounded-md bg-primary text-primary-foreground shadow-xs"}`}>
 										{isComparing
 											? `${earlierVisitIndex === 0 ? "Initial" : `V${earlierVisitIndex + 1}`} (${earlierVisit ? formatVisitDate(earlierVisit.d) : ""}) ➔ ${laterVisitIndex === visits.length - 1 ? "Latest" : `V${laterVisitIndex + 1}`} (${laterVisit ? formatVisitDate(laterVisit.d) : ""})`
 											: `Visit ${inspectorVisitIndex + 1} (${inspectedVisit ? formatVisitDate(inspectedVisit.d) : ""})`}
@@ -1760,15 +1768,15 @@ export function ObservationsView({
 														<div
 															key={item.id}
 															className={`flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4 py-2.5 px-3.5 rounded-xl text-xs transition-colors border ${activeEval.severity === "pathology"
-																? "bg-primary/[0.06] text-primary border-primary/30 shadow-2xs"
+																? "bg-[#dc3545]/[0.06] border-[#dc3545]/40 shadow-2xs"
 																: activeEval.severity === "watch"
-																	? "bg-amber-500/[0.06] border-amber-500/30 shadow-2xs"
+																	? "bg-[#dc3545]/[0.06] border-[#dc3545]/40 shadow-2xs"
 																	: "bg-card hover:bg-muted/40 border-border/80 shadow-2xs"
 																}`}
 														>
 															{/* Structure Label with Severity Dot */}
 															<div className="flex items-center gap-2 min-w-[150px] sm:w-[170px] lg:w-[190px] 2xl:w-[210px] shrink-0 pt-0.5">
-																<span className={`w-2 h-2 rounded-full shrink-0 ${activeEval.dotClass}`} />
+																<span className={`w-2 h-2 rounded-full shrink-0 ${activeEval.severity === "pathology" || activeEval.severity === "watch" ? "bg-[#dc3545]" : activeEval.dotClass}`} />
 																<span className="font-semibold text-foreground break-words leading-tight">{item.label}</span>
 															</div>
 
@@ -1801,9 +1809,9 @@ export function ObservationsView({
 																			</span>
 																			<span
 																				className={`font-semibold break-words leading-snug ${laterEval.severity === "pathology"
-																					? "text-primary dark:text-[#2990d8]"
+																					? "text-[#dc3545]"
 																					: laterEval.severity === "watch"
-																						? "text-amber-700 dark:text-amber-300"
+																						? "text-[#dc3545]"
 																						: "text-foreground"
 																					}`}
 																				title={laterVal}
@@ -1824,9 +1832,9 @@ export function ObservationsView({
 																	<div className="flex items-baseline gap-1.5 text-xs min-w-0 flex-wrap">
 																		<span
 																			className={`font-semibold break-words leading-snug ${inspectedEval.severity === "pathology"
-																				? "text-primary dark:text-[#2990d8]"
+																				? "text-[#dc3545]"
 																				: inspectedEval.severity === "watch"
-																					? "text-amber-700 dark:text-amber-300"
+																					? "text-[#dc3545]"
 																					: "text-foreground"
 																				}`}
 																			title={inspectedVal}
@@ -1858,7 +1866,7 @@ export function ObservationsView({
 												: `Visit ${inspectorVisitIndex + 1} Findings`}
 										</span>
 									</div>
-									<span className="text-xs text-muted-foreground font-semibold">
+									<span className={`text-xs font-bold whitespace-nowrap shrink-0 ${isComparing ? "text-muted-foreground" : "px-2.5 py-1 rounded-md bg-primary text-primary-foreground shadow-xs"}`}>
 										{isComparing
 											? `${earlierVisitIndex === 0 ? "Initial" : `V${earlierVisitIndex + 1}`} (${earlierVisit ? formatVisitDate(earlierVisit.d) : ""}) ➔ ${laterVisitIndex === visits.length - 1 ? "Latest" : `V${laterVisitIndex + 1}`} (${laterVisit ? formatVisitDate(laterVisit.d) : ""})`
 											: `Visit ${inspectorVisitIndex + 1} (${inspectedVisit ? formatVisitDate(inspectedVisit.d) : ""})`}
@@ -1903,15 +1911,15 @@ export function ObservationsView({
 														<div
 															key={item.id}
 															className={`flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4 py-2.5 px-3.5 rounded-xl text-xs transition-colors border ${activeEval.severity === "pathology"
-																? "bg-primary/[0.06] text-primary border-primary/30 shadow-2xs"
+																? "bg-[#dc3545]/[0.06] border-[#dc3545]/40 shadow-2xs"
 																: activeEval.severity === "watch"
-																	? "bg-amber-500/[0.06] border-amber-500/30 shadow-2xs"
+																	? "bg-[#dc3545]/[0.06] border-[#dc3545]/40 shadow-2xs"
 																	: "bg-card hover:bg-muted/40 border-border/80 shadow-2xs"
 																}`}
 														>
 															{/* Structure Label with Severity Dot */}
 															<div className="flex items-center gap-2 min-w-[150px] sm:w-[170px] lg:w-[190px] 2xl:w-[210px] shrink-0 pt-0.5">
-																<span className={`w-2 h-2 rounded-full shrink-0 ${activeEval.dotClass}`} />
+																<span className={`w-2 h-2 rounded-full shrink-0 ${activeEval.severity === "pathology" || activeEval.severity === "watch" ? "bg-[#dc3545]" : activeEval.dotClass}`} />
 																<span className="font-semibold text-foreground break-words leading-tight">{item.label}</span>
 															</div>
 
@@ -1944,9 +1952,9 @@ export function ObservationsView({
 																			</span>
 																			<span
 																				className={`font-semibold break-words leading-snug ${laterEval.severity === "pathology"
-																					? "text-primary dark:text-[#2990d8]"
+																					? "text-[#dc3545]"
 																					: laterEval.severity === "watch"
-																						? "text-amber-700 dark:text-amber-300"
+																						? "text-[#dc3545]"
 																						: "text-foreground"
 																					}`}
 																				title={laterVal}
@@ -1967,9 +1975,9 @@ export function ObservationsView({
 																	<div className="flex items-baseline gap-1.5 text-xs min-w-0 flex-wrap">
 																		<span
 																			className={`font-semibold break-words leading-snug ${inspectedEval.severity === "pathology"
-																				? "text-primary dark:text-[#2990d8]"
+																				? "text-[#dc3545]"
 																				: inspectedEval.severity === "watch"
-																					? "text-amber-700 dark:text-amber-300"
+																					? "text-[#dc3545]"
 																					: "text-foreground"
 																				}`}
 																			title={inspectedVal}

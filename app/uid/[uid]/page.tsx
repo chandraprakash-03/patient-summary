@@ -2,7 +2,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import * as React from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { loadPatientWithClinicalSummary } from "@/lib/services/patient-data.service";
 import {
 	PatientData,
@@ -13,6 +14,7 @@ import { AppHeader } from "@/components/app-header";
 import { VisitSummary } from "@/components/patient/visit-summary";
 import { ClinicalMetricsView } from "@/components/charts/clinical-metrics-view";
 import { ObservationsView } from "@/components/patient/observations-view";
+import { PatientContextSidebar } from "@/components/patient/patient-context-sidebar";
 import {
 	Sheet,
 	SheetContent,
@@ -40,6 +42,29 @@ export default function PatientDetailPage() {
 		useState<PatientClinicalSummary | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+	const [sidebarWidth, setSidebarWidth] = useState(440);
+	const [resizing, setResizing] = useState(false);
+
+	const startResize = useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			e.preventDefault();
+			const startX = e.clientX;
+			const startW = sidebarWidth;
+			setResizing(true);
+			const onMove = (ev: PointerEvent) => {
+				const next = startW + (ev.clientX - startX);
+				setSidebarWidth(Math.min(800, Math.max(280, next)));
+			};
+			const onUp = () => {
+				setResizing(false);
+				window.removeEventListener("pointermove", onMove);
+				window.removeEventListener("pointerup", onUp);
+			};
+			window.addEventListener("pointermove", onMove);
+			window.addEventListener("pointerup", onUp);
+		},
+		[sidebarWidth]
+	);
 
 	useEffect(() => {
 		const loadData = async () => {
@@ -147,9 +172,9 @@ export default function PatientDetailPage() {
 			return (
 				<ul className="list-disc pl-5 space-y-1.5">
 					{sections.map((section, idx) => (
-						<li key={idx} className="text-xs leading-relaxed text-slate-800 dark:text-slate-200">
+						<li key={idx} className="text-[13.5px] leading-relaxed text-slate-900 dark:text-slate-100">
 							<strong className="text-foreground font-bold">{section.heading}:</strong>{" "}
-							<span className="text-slate-800 dark:text-slate-200">{section.content}</span>
+							<span className="text-slate-900 dark:text-slate-100 font-medium">{section.content}</span>
 						</li>
 					))}
 				</ul>
@@ -165,11 +190,11 @@ export default function PatientDetailPage() {
 			if (clinicalSummary.beSummary) {
 				summaryElements.push(
 					<div key="bilateral" className="space-y-1.5">
-						<div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#1176bc]">
+						<div className="flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-wider text-[#1176bc]">
 							<Circle className="w-2 h-2 fill-[#1176bc]" />
 							Bilateral
 						</div>
-						<div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-1">{clinicalSummary.beSummary}</div>
+						<div className="text-[13.5px] font-medium text-slate-900 dark:text-slate-100 leading-relaxed pl-1">{clinicalSummary.beSummary}</div>
 					</div>
 				);
 			}
@@ -178,7 +203,7 @@ export default function PatientDetailPage() {
 				const formattedRE = formatSummaryText(clinicalSummary.reSummary);
 				summaryElements.push(
 					<div key="re" className="space-y-1.5">
-						<div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-800 dark:text-sky-300">
+						<div className="flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-wider text-sky-800 dark:text-sky-300">
 							<Circle className="w-2 h-2 fill-sky-500" />
 							Right Eye (RE)
 						</div>
@@ -191,7 +216,7 @@ export default function PatientDetailPage() {
 				const formattedLE = formatSummaryText(clinicalSummary.leSummary);
 				summaryElements.push(
 					<div key="le" className="space-y-1.5">
-						<div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300">
+						<div className="flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-wider text-purple-800 dark:text-purple-300">
 							<Circle className="w-2 h-2 fill-purple-500" />
 							Left Eye (LE)
 						</div>
@@ -203,19 +228,19 @@ export default function PatientDetailPage() {
 			if (clinicalSummary.clinicalNote) {
 				summaryElements.push(
 					<div key="clinical-note" className="space-y-1.5">
-						<div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-foreground">
+						<div className="flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-wider text-foreground">
 							<FileText className="w-3.5 h-3.5 text-[#1176bc]" />
 							Clinical Note
 						</div>
-						<div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-1">{clinicalSummary.clinicalNote}</div>
+						<div className="text-[13.5px] font-medium text-slate-900 dark:text-slate-100 leading-relaxed pl-1">{clinicalSummary.clinicalNote}</div>
 					</div>
 				);
 			}
 
 			return summaryElements.length > 0 ? (
-				<div className="space-y-4 divide-y divide-border/60">
+				<div className="divide-y divide-border/60">
 					{summaryElements.map((el, i) => (
-						<div key={i} className={i > 0 ? "pt-3" : ""}>{el}</div>
+						<div key={i} className={i === 0 ? "pb-4" : i === summaryElements.length - 1 ? "pt-4" : "py-4"}>{el}</div>
 					))}
 				</div>
 			) : null;
@@ -334,6 +359,17 @@ export default function PatientDetailPage() {
 				showPatientInfo
 				patientUID={uid}
 				mrNo={computedData.mrno}
+				patientName={patientData.p.name ?? "Deepakpandi N"}
+				ageSex={
+					[
+						patientData.p.age !== undefined && patientData.p.age !== ""
+							? `${patientData.p.age}Y`
+							: "34Y",
+						patientData.p.sex ?? "M",
+					]
+						.filter(Boolean)
+						.join("/")
+				}
 			/>
 
 			{/* Mobile Summary Toggle (below header) */}
@@ -351,44 +387,19 @@ export default function PatientDetailPage() {
 			{/* Main Split-Screen Layout */}
 			<div className="flex-1 min-h-0 flex flex-col lg:flex-row w-full lg:overflow-hidden">
 
-				{/* LEFT SIDEBAR */}
-				<aside className={`w-full lg:w-[280px] xl:w-[300px] 2xl:w-[320px] shrink-0 border-b lg:border-b-0 lg:border-r border-[#cde1ef] dark:border-border bg-white dark:bg-card flex flex-col transition-all duration-200 ${
-					mobileSidebarOpen ? "block max-h-[360px] lg:max-h-none h-auto lg:h-full" : "hidden lg:flex lg:h-full"
-				}`}>
-					{/* Sidebar header with left/right padding */}
-					<div className="px-6 py-4 border-b border-[#cde1ef]/60 dark:border-border/60 flex items-center justify-between shrink-0">
-						<div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-							<Stethoscope className="w-4 h-4 text-[#1176bc]" />
-							<span>Patient Context</span>
-						</div>
-						<button
-							onClick={() => setMobileSidebarOpen(false)}
-							className="lg:hidden text-xs text-muted-foreground hover:text-foreground px-2 py-0.5 rounded border bg-muted/40"
-						>
-							Close
-						</button>
-					</div>
-
-					{/* Sidebar content with generous left/right padding */}
-					<div className="flex-1 overflow-y-auto box-scroll px-6 py-5 space-y-4">
-						<div className="space-y-2.5">
-							<p className="text-xs font-bold uppercase tracking-widest text-slate-700 dark:text-slate-300 flex items-center gap-2">
-								<FileText className="w-3.5 h-3.5 text-[#1176bc]" />
-								Clinical Status &amp; Course
-							</p>
-							{computedData.summary ? (
-								computedData.summary
-							) : (
-								<div className="text-xs text-muted-foreground px-3 py-2.5 rounded-lg border bg-muted/20">
-									No clinical summary recorded.
-								</div>
-							)}
-						</div>
-					</div>
-				</aside>
+				{/* LEFT SIDEBAR: Redesigned Patient Context Accordion */}
+				<PatientContextSidebar
+					clinicalSummary={clinicalSummary}
+					sidebarWidth={sidebarWidth}
+					setSidebarWidth={setSidebarWidth}
+					mobileOpen={mobileSidebarOpen}
+					setMobileOpen={setMobileSidebarOpen}
+					resizing={resizing}
+					startResize={startResize}
+				/>
 
 				{/* RIGHT MAIN WORKSPACE */}
-				<main className="flex-1 min-h-0 overflow-y-auto box-scroll p-4 sm:p-5 lg:p-6 space-y-5 sm:space-y-6 w-full max-w-[3840px] mx-auto bg-[#dcebf5] dark:bg-background">
+				<main className="flex-1 min-h-0 overflow-y-auto box-scroll p-2 space-y-5 sm:space-y-6 w-full max-w-[3840px] mx-auto bg-[#dcebf5] dark:bg-background">
 
 					{/* Clinical Metrics */}
 					{computedData.hasLineChartData && (

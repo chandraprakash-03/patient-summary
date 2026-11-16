@@ -99,92 +99,67 @@ export function ClinicalMetricsView({
 
 	return (
 		<div className="w-full h-full flex flex-col space-y-2">
-			{/* Top toolbar */}
-			<div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-white dark:bg-slate-900/60 rounded-xl border border-border shadow-xs shrink-0">
-				<div className="flex items-center gap-3.5 flex-wrap">
-					<div className="flex items-center gap-2.5">
-						<div className="w-7 h-7 rounded-lg bg-[#1176bc]/10 text-[#1176bc] flex items-center justify-center">
-							<Activity className="w-4 h-4" />
+			{/* Latest clinical status — reference header and snapshot cards */}
+			<div className="shrink-0 rounded-[18px] border border-[#dbe5ef] bg-white px-5 py-4 shadow-[0_8px_24px_rgba(58,83,109,0.05)] dark:bg-slate-900/60 dark:border-slate-700">
+				<div className="flex flex-col gap-3.5">
+					<div className="flex items-center justify-between gap-4">
+						<div className="flex items-center gap-2 text-[#5d7595]">
+							<Activity className="h-[18px] w-[18px] text-[#0089df] stroke-[2.1]" />
+							<h2 className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#5d7595]">
+								Latest Clinical Status
+							</h2>
+							{latestSnapshot && (
+								<span className="text-[12px] font-medium tracking-normal text-[#8499b6]">
+									{format(parseISO(latestSnapshot.date), "dd MMM yyyy")}
+								</span>
+							)}
 						</div>
-						<h2 className="text-[13px] font-semibold text-foreground tracking-tight">
-							Visual Acuity, IOP &amp; CMT Monitoring
-						</h2>
+
+						<div className="inline-flex shrink-0 rounded-xl border border-[#dbe5ef] bg-[#f7f9fc] p-0.5 dark:border-slate-700 dark:bg-slate-800">
+							<button
+								data-no-hover
+								onClick={() => setViewMode("matrix")}
+								className={`flex h-8 items-center gap-2 rounded-[9px] px-3 text-xs font-semibold transition-colors ${viewMode === "matrix" ? "border border-[#e1e9f2] bg-white text-[#0077bc] shadow-[0_1px_2px_rgba(28,54,81,0.08)] dark:bg-slate-700" : "border border-transparent text-[#607795] hover:bg-white/70 dark:hover:bg-slate-700"}`}
+								title="Tabular status grid"
+							>
+								<Grid3X3 className="h-3.5 w-3.5" />
+								<span>Status Grid</span>
+							</button>
+							<button
+								data-no-hover
+								onClick={() => setViewMode("trend")}
+								className={`flex h-8 items-center gap-2 rounded-[9px] px-3 text-xs font-semibold transition-colors ${viewMode === "trend" ? "border border-[#e1e9f2] bg-white text-[#0077bc] shadow-[0_1px_2px_rgba(28,54,81,0.08)] dark:bg-slate-700" : "border border-transparent text-[#607795] hover:bg-white/70 dark:hover:bg-slate-700"}`}
+								title="Trend curves"
+							>
+								<LineChartIcon className="h-3.5 w-3.5" />
+								<span>Trend Curves</span>
+							</button>
+						</div>
 					</div>
 
-					{/* Latest Snapshot Badges */}
 					{latestSnapshot && (
-						<div className="flex items-center gap-2.5 flex-wrap">
-							<span className="text-[13px] text-muted-foreground font-medium">
-								Latest ({format(parseISO(latestSnapshot.date), "dd MMM yyyy")}):
-							</span>
-
+						<div className="flex flex-wrap items-center gap-3">
 							{(latestSnapshot.latestREVA || latestSnapshot.latestLEVA) && (
-								<span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-muted/40 text-foreground border border-border/70 shadow-2xs">
-									<Eye className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-									<span className="text-[13px] font-semibold text-muted-foreground uppercase">VA:</span>
-									<span className="text-[13px] font-bold text-sky-700 dark:text-sky-400">RE</span>
-									<strong className="font-semibold text-foreground">{latestSnapshot.latestREVA?.y || "—"}</strong>
-									<span className="text-muted-foreground/40">|</span>
-									<span className="text-[13px] font-bold text-purple-700 dark:text-purple-400">LE</span>
-									<strong className="font-semibold text-foreground">{latestSnapshot.latestLEVA?.y || "—"}</strong>
-								</span>
+								<div className="min-w-[230px] rounded-xl border border-[#dbe5ef] bg-[#f8fafd] px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70">
+									<p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[#91a4c0]">Visual Acuity</p>
+									<div className="flex items-center gap-4 text-[13px] font-bold">
+										<span><span className="mr-1 text-[#0089df]">RE</span>{latestSnapshot.latestREVA?.y || "—"}</span>
+										<span><span className="mr-1 text-[#6a27f5]">LE</span>{latestSnapshot.latestLEVA?.y || "—"}</span>
+									</div>
+								</div>
 							)}
 
 							{(latestSnapshot.latestREIOP || latestSnapshot.latestLEIOP) && (
-								<span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-muted/40 text-foreground border border-border/70 shadow-2xs">
-									<Droplets className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-									<span className="text-[13px] font-semibold text-muted-foreground uppercase">IOP:</span>
-									<span className="text-[13px] font-bold text-sky-700 dark:text-sky-400">RE</span>
-									<strong className="font-semibold text-foreground">{latestSnapshot.latestREIOP ? `${latestSnapshot.latestREIOP.y}` : "—"}</strong>
-									<span className="text-muted-foreground/40">|</span>
-									<span className="text-[13px] font-bold text-purple-700 dark:text-purple-400">LE</span>
-									<strong className="font-semibold text-foreground">{latestSnapshot.latestLEIOP ? `${latestSnapshot.latestLEIOP.y}` : "—"}</strong>
-									<span className="text-[13px] text-muted-foreground">mmHg</span>
-								</span>
-							)}
-
-							{(latestSnapshot.latestRECMT || latestSnapshot.latestLECMT) && (
-								<span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-muted/40 text-foreground border border-border/70 shadow-2xs">
-									<ScanLine className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-									<span className="text-[13px] font-semibold text-muted-foreground uppercase">CMT:</span>
-									<span className="text-[13px] font-bold text-sky-700 dark:text-sky-400">RE</span>
-									<strong className="font-semibold text-foreground">{latestSnapshot.latestRECMT ? `${latestSnapshot.latestRECMT.y}` : "—"}</strong>
-									<span className="text-muted-foreground/40">|</span>
-									<span className="text-[13px] font-bold text-purple-700 dark:text-purple-400">LE</span>
-									<strong className="font-semibold text-foreground">{latestSnapshot.latestLECMT ? `${latestSnapshot.latestLECMT.y}` : "—"}</strong>
-									<span className="text-[13px] text-muted-foreground">µm</span>
-								</span>
+								<div className="min-w-[230px] rounded-xl border border-[#dbe5ef] bg-[#f8fafd] px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70">
+									<p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[#91a4c0]">Intraocular Pressure</p>
+									<div className="flex items-center gap-4 text-[13px] font-bold">
+										<span><span className="mr-1 text-[#0089df]">RE</span>{latestSnapshot.latestREIOP ? `${latestSnapshot.latestREIOP.y} mmHg` : "—"}</span>
+										<span><span className="mr-1 text-[#6a27f5]">LE</span>{latestSnapshot.latestLEIOP ? `${latestSnapshot.latestLEIOP.y} mmHg` : "—"}</span>
+									</div>
+								</div>
 							)}
 						</div>
 					)}
-				</div>
-
-				{/* View toggle */}
-				<div className="flex items-center p-1 bg-muted/50 dark:bg-muted/30 rounded-lg border border-border shrink-0 gap-1">
-					<button
-						onClick={() => setViewMode("matrix")}
-						className={`flex items-center gap-1.5 px-3.5 py-1.5 h-8 rounded-md text-xs font-semibold transition-all duration-150 ${
-							viewMode === "matrix"
-								? "bg-[#1176bc] text-white shadow-xs font-bold"
-								: "text-muted-foreground hover:text-foreground hover:bg-background/60"
-						}`}
-						title="Tabular status grid"
-					>
-						<Grid3X3 className={`w-3.5 h-3.5 ${viewMode === "matrix" ? "text-white" : "text-[#1176bc]"}`} />
-						<span>Status Grid</span>
-					</button>
-					<button
-						onClick={() => setViewMode("trend")}
-						className={`flex items-center gap-1.5 px-3.5 py-1.5 h-8 rounded-md text-xs font-semibold transition-all duration-150 ${
-							viewMode === "trend"
-								? "bg-[#1176bc] text-white shadow-xs font-bold"
-								: "text-muted-foreground hover:text-foreground hover:bg-background/60"
-						}`}
-						title="Trend curves"
-					>
-						<LineChartIcon className={`w-3.5 h-3.5 ${viewMode === "trend" ? "text-white" : "text-[#1176bc]"}`} />
-						<span>Trend Curves</span>
-					</button>
 				</div>
 			</div>
 

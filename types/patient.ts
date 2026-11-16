@@ -40,6 +40,10 @@ export interface PatientInfo {
 	f: string; // first visit date
 	l: string; // last visit date
 	dept?: string; // department
+	name?: string; // patient name
+	age?: number | string; // age in years
+	sex?: string; // M / F / Other
+	uhid?: string; // hospital unique ID
 	s?: {
 		h?: string; // systemic illnesses
 		d?: string; // durations
